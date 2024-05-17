@@ -5,7 +5,7 @@ __all__ = ["COMMON", "CDNs", "CDNs_rev"]
 COMMON = {
     "Cloudflare": "Cloudflare - https://www.cloudflare.com",
     "Incapsula": "Incapsula - https://www.incapsula.com/",
-    "Cloudfront": "Cloudfront - https://aws.amazon.com/cloudfront/",
+    "Amazon": "Amazon - https://aws.amazon.com/cloudfront/",
     "Akamai": "Akamai - https://akamai.com",
     "Airee": "Airee - https://airee.international",
     "CacheFly": "CacheFly - https://www.cachefly.com/",
@@ -25,7 +25,7 @@ More inclusive list of available CDNs
 Format: CDNs[<cdn_domain>] = <cdn_name>
 """
 CDNs = {
-    ".amazonaws.com": "Amazon AWS",
+    ".amazonaws.com": "Amazon",
     "cdn.geeksforgeeks.org": "GeeksForGeeksCDN",
     ".discordapp.com": "Discord",
     ".airee.international": "Airee",
@@ -85,7 +85,7 @@ CDNs = {
     ".insnw.net": "InstartLogic",
     ".inscname.net": "InstartLogic",
     ".internapcdn.net": "Internap",
-    ".cloudfront.net": "Cloudfront",
+    ".cloudfront.net": "Amazon",
     ".kxcdn.com": "KeyCDN",
     ".cotcdn.net": "CotendoCDN",
     ".cachefly.net": "Cachefly",

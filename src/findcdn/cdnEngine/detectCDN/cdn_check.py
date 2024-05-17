@@ -175,12 +175,12 @@ class cdnCheck:
                         whois_data.append(org)
                 except AttributeError:
                     pass
-                try:
-                    org = response.lookup_rdap()["network"]["name"]
-                    if org != "BAREFRUIT-ERRORHANDLING":
-                        whois_data.append(org)
-                except AttributeError:
-                    pass
+                # try:
+                #     org = response.lookup_rdap()["network"]["name"]
+                #     if org != "BAREFRUIT-ERRORHANDLING":
+                #         whois_data.append(org)
+                # except AttributeError:
+                #     pass
             except HTTPLookupError:
                 pass
             except IPDefinedError:
