@@ -28,7 +28,7 @@ class DomainPot:
         # Convert to list of type domain
         for dom in domains:
             dom_in = detectCDN.Domain(
-                dom, list(), list(), list(), list(), list(), list(), list()
+                dom, list(), list(), list(), list(), list(), list(), list(), list(), list()
             )
             self.domains.append(dom_in)
 
@@ -46,14 +46,15 @@ def chef_executor(
 
     # Run checks
     try:
-        detective.all_checks(
-            # Timeout is split by .4 so that each chunk can only take less than half.
-            domain,
-            verbose=verbosity,
-            timeout=math.ceil(timeout * 0.4),
-            agent=user_agent,
-            interactive=interactive,
-        )
+        if not domain.cdn_present:
+            detective.all_checks(
+                # Timeout is split by .4 so that each chunk can only take less than half.
+                domain,
+                verbose=verbosity,
+                timeout=math.ceil(timeout * 0.4),
+                agent=user_agent,
+                interactive=interactive,
+            )
     except Exception as e:
         # Incase some uncaught error somewhere
         if interactive or verbosity:
@@ -95,12 +96,12 @@ class Chef:
                 cpu_count = 1
             self.threads = cpu_count  # type: ignore
 
-    def grab_cdn(self, double: bool = False):  # type: ignore
+    def grab_cdn(self, second_run: bool = False):  # type: ignore
         """Check for CDNs used be domain list."""
         # Use Concurrent futures to multithread with pools
         job_count = 0
 
-        if self.verbose:
+        if self.verbose and not second_run:
             # Give user information about the run:
             print(f"Using {self.threads} threads with a {self.timeout} second timeout")
             print(f"User Agent: {self.agent}\n")
@@ -108,14 +109,7 @@ class Chef:
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=self.threads
         ) as executor:
-            # If double, Double contents to combat CDN cache misses
-            newpot = []
-            if double:
-                for domain in self.pot.domains:
-                    newpot.append(domain)
-            for domain in self.pot.domains:
-                newpot.append(domain)
-            job_count = len(newpot)
+            job_count = len(self.pot.domains)
             # Setup pbar with correct amount size
             if self.pbar:
                 pbar = tqdm(total=job_count)
@@ -130,7 +124,7 @@ class Chef:
                     self.verbose,
                     self.interactive,
                 )
-                for domain in newpot
+                for domain in self.pot.domains
             }
 
             # Comb future objects for completed task pool.
@@ -165,8 +159,13 @@ class Chef:
 
     def run_checks(self, double: bool = False) -> int:
         """Run analysis on the internal domain pool using detectCDN library."""
-        cnt = self.grab_cdn(double)
+        cnt = self.grab_cdn(second_run=False)
         self.has_cdn()
+
+        if double:
+            cnt += self.grab_cdn(second_run=True)
+            self.has_cdn()
+        
         return cnt
 
 

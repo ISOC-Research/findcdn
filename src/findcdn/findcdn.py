@@ -110,11 +110,23 @@ def main(
 
         # Setup formatting for json output
         if len(domain.cdns) > 0 or all_domains:
-            domain_dict[domain.url] = {
-                "IP": str(domain.ip)[1:-1],
-                "cdns": str(domain.cdns)[1:-1],
-                "cdns_by_names": str(domain.cdns_by_name)[1:-1],
-            }
+            if domain.not_cymru_cdn or not domain.cdn_present:
+                domain_dict[domain.url] = {
+                    "IP": str(domain.ip)[1:-1],
+                    "cdns": str(domain.cdns)[1:-1],
+                    "cdns_by_names": str(domain.cdns_by_name)[1:-1],
+                    "cnames": str(domain.cnames)[1:-1],
+                    "headers": str(domain.headers)[1:-1],
+                    "namesrvs": str(domain.namesrvs)[1:-1],
+                    "cymru_whois_data": str(domain.cymru_whois_data)[1:-1],
+                }
+            else:
+                domain_dict[domain.url] = {
+                    "IP": str(domain.ip)[1:-1],
+                    "cdns": str(domain.cdns)[1:-1],
+                    "cdns_by_names": str(domain.cdns_by_name)[1:-1],
+                    "cymru_whois_data": str(domain.cymru_whois_data)[1:-1],
+                }
 
     # Create JSON from the results and return (results, successful jobs)
     json_dict = {}
