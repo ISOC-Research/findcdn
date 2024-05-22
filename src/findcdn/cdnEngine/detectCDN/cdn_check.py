@@ -11,6 +11,9 @@ from typing import List
 from urllib import request as request
 from urllib.error import URLError
 from socket import socket, AF_INET, SOCK_STREAM, SHUT_WR
+from typing import Dict
+from time import time
+from struct import unpack
 
 # Third-Party Libraries
 from dns.resolver import NXDOMAIN, NoAnswer, NoNameservers, Resolver, Timeout, query
@@ -23,7 +26,6 @@ from .cdn_err import NoIPaddress
 
 # Global variables
 LIFETIME = 10
-
 
 class Domain:
     """Domain class allows for storage of metadata on domain."""
@@ -55,6 +57,20 @@ class Domain:
         self.not_cymru_cdn = False
         self.cdn_present = False
 
+class DomainPot:
+    """DomainPot defines the "pot" which Domain objects are stored."""
+
+    def __init__(self, domains: List[str]):
+        """Define the pot for the Chef to use."""
+        self.domains: List[Domain] = []
+        self.ips: Dict[str,List[str]] = {}
+
+        # Convert to list of type domain
+        for dom in domains:
+            dom_in = Domain(
+                dom, list(), list(), list(), list(), list(), list(), list(), list(), list()
+            )
+            self.domains.append(dom_in)
 
 class cdnCheck:
     """cdnCheck runs analysis and stores discovered data in Domain object."""
@@ -62,6 +78,69 @@ class cdnCheck:
     def __init__(self):
         """Initialize the orchestrator of analysis."""
         self.running = False
+    
+    def get_ips_whois(self, pot: DomainPot, verbose: bool = False) -> int:
+        """Get IP addresses for all domains and whois information, where available."""
+        start_time_ip = time()
+        # get all IPs
+        for dom in pot.domains:
+            self.ip(dom)
+            for ip in dom.ip:
+                pot.ips[ip] = []
+        end_time_ip = time()
+
+        # if there are no IPs, do not run
+        if len(pot.ips) == 0:
+            print("No IPs, skipping")
+            return None
+        
+        # define a temp list to assign
+        temp_cymru = []
+        tc_response = ""
+        
+        # build the content
+        tc_content = "begin\nverbose\n"
+        for ip in pot.ips:
+            tc_content += f"{ip}\n"
+        tc_content += "end"
+
+        # run the whois lookup
+        if verbose:
+            print(f"Running team-cymru query for {len(pot.ips)} IPs")
+        
+        # run the query
+        tc_response = netcat("whois.cymru.com", 43, tc_content.encode())
+        print(tc_response)
+        end_time_whois = time()
+        # parse the results of the query, if they exist
+        if tc_response:
+            temp_cymru = parse_cymru_results(tc_response)
+            
+            for data in temp_cymru:
+                # assign the data to the respective IP
+                pot.ips[data[1]] = data
+            end_time_parse = time()
+
+        # re-assign the whois info to each domain
+        for dom in pot.domains:
+            for ip in dom.ip:
+                # get the whois info
+                whois = pot.ips[ip]
+                # print(whois)
+                if len(whois)>6:
+                    if whois[6] is not None and whois[6] not in dom.cymru_whois_data:
+                        dom.cymru_whois_data.append(whois[6])
+
+                    # assign the full results to the domain
+                    dom.cymru_data.append(whois)
+        end_time_reassign = time()
+
+        print("IP lookup time:",end_time_ip-start_time_ip)
+        print("Whois lookup time:",end_time_whois-end_time_ip)
+        print("Whois parse time:",end_time_parse-end_time_whois)
+        print("Whois reassign time:",end_time_reassign-end_time_parse)
+        
+        return 0
 
     def ip(self, dom: Domain) -> List[int]:
         """Determine IP addresses the domain resolves to."""
@@ -311,15 +390,11 @@ class cdnCheck:
     ) -> int:
         """Option to run everything in this library then digest."""
         # Obtain each attributes data
-        self.ip(dom)
+        # self.ip(dom)
         self.cname(dom, timeout)
         self.https_lookup(dom, timeout, agent, interactive, verbose)
-        self.cymru_lookup(dom, interactive, verbose)
+        # self.cymru_lookup(dom, interactive, verbose)
         # self.whois(dom, interactive, verbose)
-
-        # log
-        # print("cd",dom.cymru_data)
-        # print("cwhois",dom.cymru_whois_data)
 
         # Digest the data
         return_code = self.data_digest(dom)
@@ -343,19 +418,19 @@ def netcat(hostname: str, port: int, content: bytes) -> str | None:
     s = socket(AF_INET, SOCK_STREAM)
 
     # set the socket timeout
-    s.settimeout(10)
+    s.settimeout(120)
     
     # connect and send data
     s.connect((hostname, port))
     s.sendall(content)
     
     # receive data
-    data = s.recv(1024)
-
+    data = s.recv(4096)
+    
     # close the connection
     s.shutdown(SHUT_WR)
     s.close()
-
+    
     # check that data was returned
     if len(data) == 0:
         return None

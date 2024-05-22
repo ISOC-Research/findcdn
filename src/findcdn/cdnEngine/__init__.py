@@ -1,6 +1,6 @@
 """cdnEngine library."""
 from . import detectCDN
-from .cdnEngine import Chef, DomainPot, run_checks
+from .cdnEngine import Chef, run_checks
 
 """Define public exports."""
-__all__ = ["DomainPot", "Chef", "run_checks", "detectCDN"]
+__all__ = ["Chef", "run_checks", "detectCDN"]

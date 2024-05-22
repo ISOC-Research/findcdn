@@ -15,7 +15,7 @@ COMMON = {
     "Limelight": "Limelight -  https://www.limelight.com",
     "Fastly": "Fastly - https://www.fastly.com/",
     "Myracloud": "Myra - https://myracloud.com",
-    "msecnd.ne": "Microsoft Azure - https://azure.microsoft.com/en-us/services/cdn/",
+    "MicrosoftAzure": "Microsoft Azure - https://azure.microsoft.com/en-us/services/cdn/",
     "Clever-cloud": "Clever Cloud - https://www.clever-cloud.com/",
 }
 
@@ -31,6 +31,7 @@ CDNs = {
     ".airee.international": "Airee",
     ".myracloud.com": "Myra",
     ".msecnd.ne": "MicrosoftAzure",
+    "microsoft-corp-": "MicrosoftAzure",
     ".clever-cloud.com": "Clever-cloud",
     ".turbobytes-cdn.com": "Turbo Bytes",
     ".akadns.net": "Akamai",
@@ -99,6 +100,9 @@ CDNs = {
     ".att-dsa.net": "AT&T",
     ".vo.msecnd.net": "MicrosoftAzure",
     ".azureedge.net": "MicrosoftAzure",
+    ".azure": "MicrosoftAzure",
+    "-azure": "MicrosoftAzure",
+    "live.com.edgekey.net": "MicrosoftAzure",
     ".voxcdn.net": "VoxCDN",
     ".bluehatnetwork.com": "BlueHatNetwork",
     ".swiftcdn1.com": "SwiftCDN",

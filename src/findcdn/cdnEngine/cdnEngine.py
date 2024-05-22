@@ -9,28 +9,13 @@ if a given domain or set of domains use a CDN.
 import concurrent.futures
 import math
 import os
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 # Third-Party Libraries
 from tqdm import tqdm
 
 # Internal Libraries
 from . import detectCDN
-
-
-class DomainPot:
-    """DomainPot defines the "pot" which Domain objects are stored."""
-
-    def __init__(self, domains: List[str]):
-        """Define the pot for the Chef to use."""
-        self.domains: List[detectCDN.Domain] = []
-
-        # Convert to list of type domain
-        for dom in domains:
-            dom_in = detectCDN.Domain(
-                dom, list(), list(), list(), list(), list(), list(), list(), list(), list()
-            )
-            self.domains.append(dom_in)
 
 
 def chef_executor(
@@ -64,13 +49,33 @@ def chef_executor(
     # Return 0 for success
     return 0
 
+def chef_ip_executor(
+    pot: detectCDN.DomainPot,
+    verbosity: bool,
+    interactive: bool,
+):
+    """Attempt to make the method "threadsafe" by giving each worker its own detector."""
+    # Define detector
+    detective = detectCDN.cdnCheck()
+
+    # Run checks
+    try:
+        detective.get_ips_whois(pot, verbosity)
+    except Exception as e:
+        # Incase some uncaught error somewhere
+        if interactive or verbosity:
+            print(f"An unusual exception has occurred:\n{e}")
+        return 1
+
+    # Return 0 for success
+    return 0
 
 class Chef:
     """Chef will run analysis on the domains in the DomainPot."""
 
     def __init__(
         self,
-        pot: DomainPot,
+        pot: detectCDN.DomainPot,
         threads: int,
         timeout: int,
         user_agent: str,
@@ -78,7 +83,7 @@ class Chef:
         verbose: bool = False,
     ):
         """Give the chef the pot to use."""
-        self.pot: DomainPot = pot
+        self.pot: detectCDN.DomainPot = pot
         self.pbar: tqdm = interactive
         self.verbose: bool = verbose
         self.timeout: int = timeout
@@ -150,6 +155,46 @@ class Chef:
 
         # Return the amount of jobs done and error code
         return job_count
+    
+    def grab_ips(self):  # type: ignore
+        """Get IPs for all domains."""
+        # Use Concurrent futures to multithread with pools
+        job_count = 0
+
+        if self.verbose:
+            # Give user information about the run:
+            print(f"Using {self.threads} threads with a {self.timeout} second timeout to get IPs")
+
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.threads
+        ) as executor:
+            job_count = len(self.pot.domains)
+            # Setup pbar with correct amount size
+            if self.pbar:
+                pbar = tqdm(total=job_count)
+
+            # Assign workers and assign to results list
+            results = {
+                executor.submit(
+                    chef_ip_executor,
+                    self.pot,
+                    self.verbose,
+                    self.interactive,
+                )
+            }
+
+            # Comb future objects for completed task pool.
+            for future in concurrent.futures.as_completed(results):
+                try:
+                    # Try and grab feature result to dequeue job
+                    future.result(timeout=self.timeout)
+                except concurrent.futures.TimeoutError as e:
+                    # Tell us we dropped it. Should log this instead.
+                    if self.interactive or self.verbose:
+                        print(f"Dropped due to: {e}")
+
+        # Return the amount of jobs done and error code
+        return job_count
 
     def has_cdn(self):
         """For each domain, check if domain contains CDNS. If so, tick cdn_present to true."""
@@ -159,6 +204,8 @@ class Chef:
 
     def run_checks(self, double: bool = False) -> int:
         """Run analysis on the internal domain pool using detectCDN library."""
+        cnt = self.grab_ips()
+        
         cnt = self.grab_cdn(second_run=False)
         self.has_cdn()
 
@@ -180,7 +227,7 @@ def run_checks(
 ) -> Tuple[List[detectCDN.Domain], int]:
     """Orchestrate the use of DomainPot and Chef."""
     # Our domain pot
-    dp = DomainPot(domains)
+    dp = detectCDN.DomainPot(domains)
 
     # Our chef to manage pot
     chef = Chef(dp, threads, timeout, user_agent, interactive, verbose)
