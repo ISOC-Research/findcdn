@@ -88,6 +88,7 @@ class cdnCheck:
             for ip in dom.ip:
                 pot.ips[ip] = []
         end_time_ip = time()
+        print("IP lookup time:",end_time_ip-start_time_ip)
 
         # if there are no IPs, do not run
         if len(pot.ips) == 0:
@@ -99,10 +100,10 @@ class cdnCheck:
         tc_response = ""
         
         # build the content
-        tc_content = "begin\nverbose\n"
+        tc_content = "begin\n"
         for ip in pot.ips:
             tc_content += f"{ip}\n"
-        tc_content += "end"
+        tc_content += "255.255.255.255\nend"
 
         # run the whois lookup
         if verbose:
@@ -110,16 +111,19 @@ class cdnCheck:
         
         # run the query
         tc_response = netcat("whois.cymru.com", 43, tc_content.encode())
-        print(tc_response)
+        # print(tc_response)
         end_time_whois = time()
+        print("Whois lookup time:",end_time_whois-end_time_ip)
         # parse the results of the query, if they exist
         if tc_response:
             temp_cymru = parse_cymru_results(tc_response)
             
             for data in temp_cymru:
-                # assign the data to the respective IP
-                pot.ips[data[1]] = data
+                if data[1] in pot.ips.keys():
+                    # assign the data to the respective IP
+                    pot.ips[data[1]] = data
             end_time_parse = time()
+        print("Whois parse time:",end_time_parse-end_time_whois)
 
         # re-assign the whois info to each domain
         for dom in pot.domains:
@@ -127,17 +131,17 @@ class cdnCheck:
                 # get the whois info
                 whois = pot.ips[ip]
                 # print(whois)
-                if len(whois)>6:
-                    if whois[6] is not None and whois[6] not in dom.cymru_whois_data:
-                        dom.cymru_whois_data.append(whois[6])
+                if len(whois)>2:
+                    if whois[2] is not None and whois[2] not in dom.cymru_whois_data:
+                        dom.cymru_whois_data.append(whois[2])
 
                     # assign the full results to the domain
                     dom.cymru_data.append(whois)
         end_time_reassign = time()
 
-        print("IP lookup time:",end_time_ip-start_time_ip)
-        print("Whois lookup time:",end_time_whois-end_time_ip)
-        print("Whois parse time:",end_time_parse-end_time_whois)
+        # print("IP lookup time:",end_time_ip-start_time_ip)
+        # print("Whois lookup time:",end_time_whois-end_time_ip)
+        # print("Whois parse time:",end_time_parse-end_time_whois)
         print("Whois reassign time:",end_time_reassign-end_time_parse)
         
         return 0
@@ -149,8 +153,12 @@ class cdnCheck:
         ip_list = []
         for domain in dom_list:
             try:
-                # Query the domain
-                response = query(domain)
+                # Seutp resolver and timeouts
+                resolver = Resolver()
+                resolver.nameservers = ['8.8.8.8','1.1.1.1']
+                resolver.lifetime = LIFETIME
+                # query the domain
+                response = resolver.resolve(domain)
                 # Assign any found IP addresses to the object
                 for ip in response:
                     if str(ip.address) not in ip_list and str(ip.address) not in dom.ip:
@@ -253,10 +261,10 @@ class cdnCheck:
         tc_response = ""
         
         # build the content
-        tc_content = "begin\nverbose\n"
+        tc_content = "begin\n"
         for ip in dom.ip:
             tc_content += f"{ip}\n"
-        tc_content += "end"
+        tc_content += "255.255.255.255\nend"
 
         # run the query
         tc_response = netcat("whois.cymru.com", 43, tc_content.encode())
@@ -267,8 +275,8 @@ class cdnCheck:
 
             # reduce the cymru results into whois-style responses for FindCDN
             for res in temp_cymru:
-                if res[6] is not None and res[6] not in dom.cymru_whois_data:
-                    dom.cymru_whois_data.append(res[6])
+                if res[2] is not None and res[2] not in dom.cymru_whois_data:
+                    dom.cymru_whois_data.append(res[2])
             
             # assign the full results to the domain
             dom.cymru_data = temp_cymru
@@ -425,40 +433,42 @@ def netcat(hostname: str, port: int, content: bytes) -> str | None:
     s.sendall(content)
     
     # receive data
-    data = s.recv(4096)
+    rstr = ""
+    while "255.255.255.255" not in rstr:
+        data = s.recv(1024)
+        rstr += repr(data)
+    # data = s.recv((num_ips * 256)+ 64)
     
     # close the connection
     s.shutdown(SHUT_WR)
     s.close()
     
     # check that data was returned
-    if len(data) == 0:
+    if len(rstr) == 0:
         return None
 
     # return the data
-    return repr(data)
+    return repr(rstr)
 
 def parse_cymru_results(response: str) -> List[List[str]]:
     '''
     Parses the results of the Team-Cymru Whois Lookup. Returns a list of lists. FindCDN uses only the AS Name. Each sub-list contains data in the order:
-    AS | IP | BGP Prefix | CC | Registry | Allocated | AS Name
+    AS | IP | AS Name
     '''
 
     # get lines list
     response_lines = response.split("\\n")
-
-    # remove first line if it is info
-    if "Bulk mode" in response_lines[0]:
-        response_lines.pop(0)
-    
-    # remove last line if info
-    if response_lines[-1] == "'":
-        response_lines.pop(-1)
     
     lines_lists: List[List[str]] = []
 
     # convert lines into lists
     for line in response_lines:
+        # skip lines without relevant IP info
+        if "|" not in line or "255.255.255.255" in line:
+            continue
+        # remove backslashes if present
+        if "\\" in line:
+            line = line.replace("\\","")
         # split on separator and strip
         line_list = [x.strip() for x in line.split("|")]
         lines_lists.append(line_list)
