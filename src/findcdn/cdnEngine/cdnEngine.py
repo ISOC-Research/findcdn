@@ -51,6 +51,8 @@ def chef_executor(
 
 def chef_ip_executor(
     pot: detectCDN.DomainPot,
+    timeout: int,
+    user_agent: str,
     verbosity: bool,
     interactive: bool,
 ):
@@ -60,7 +62,18 @@ def chef_ip_executor(
 
     # Run checks
     try:
+        # get IPs and Whois info
         detective.get_ips_whois(pot, verbosity)
+        
+        # digest current data
+        detective.full_data_digest(pot, verbosity)
+
+        # run cname/header checks on domains without CDNs
+        detective.extra_checks(pot, timeout, user_agent, verbosity)
+
+        # digest remaining data
+        detective.full_data_digest(pot, verbosity)
+
     except Exception as e:
         # Incase some uncaught error somewhere
         if interactive or verbosity:
@@ -178,6 +191,8 @@ class Chef:
                 executor.submit(
                     chef_ip_executor,
                     self.pot,
+                    self.timeout,
+                    self.agent,
                     self.verbose,
                     self.interactive,
                 )
@@ -205,13 +220,16 @@ class Chef:
     def run_checks(self, double: bool = False) -> int:
         """Run analysis on the internal domain pool using detectCDN library."""
         cnt = self.grab_ips()
-        
-        cnt = self.grab_cdn(second_run=False)
-        self.has_cdn()
 
         if double:
-            cnt += self.grab_cdn(second_run=True)
-            self.has_cdn()
+            cnt += self.grab_ips()
+        
+        # cnt = self.grab_cdn(second_run=False)
+        # self.has_cdn()
+
+        # if double:
+        #     cnt += self.grab_cdn(second_run=True)
+        #     self.has_cdn()
         
         return cnt
 
