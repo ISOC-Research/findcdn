@@ -176,11 +176,13 @@ class cdnCheck:
     ) -> int:
         """Runs CNAME and Header lookups for all domains without CDNs"""
         # perform remaining data lookups
+        extra_count = 0
         for dom in pot.domains:
             if not dom.cdn_present:
+                extra_count += 1
                 self.cname(dom, timeout)
                 self.https_lookup(dom, timeout, agent, False, verbose)
-
+        print("extra checks done:",extra_count)
         # Return to calling function
         return 0
     

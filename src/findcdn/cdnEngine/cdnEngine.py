@@ -17,72 +17,6 @@ from tqdm import tqdm
 # Internal Libraries
 from . import detectCDN
 
-
-def chef_executor(
-    domain: detectCDN.Domain,
-    timeout: int,
-    user_agent: str,
-    verbosity: bool,
-    interactive: bool,
-):
-    """Attempt to make the method "threadsafe" by giving each worker its own detector."""
-    # Define detector
-    detective = detectCDN.cdnCheck()
-
-    # Run checks
-    try:
-        if not domain.cdn_present:
-            detective.all_checks(
-                # Timeout is split by .4 so that each chunk can only take less than half.
-                domain,
-                verbose=verbosity,
-                timeout=math.ceil(timeout * 0.4),
-                agent=user_agent,
-                interactive=interactive,
-            )
-    except Exception as e:
-        # Incase some uncaught error somewhere
-        if interactive or verbosity:
-            print(f"An unusual exception has occurred:\n{e}")
-        return 1
-
-    # Return 0 for success
-    return 0
-
-def chef_ip_executor(
-    pot: detectCDN.DomainPot,
-    timeout: int,
-    user_agent: str,
-    verbosity: bool,
-    interactive: bool,
-):
-    """Attempt to make the method "threadsafe" by giving each worker its own detector."""
-    # Define detector
-    detective = detectCDN.cdnCheck()
-
-    # Run checks
-    try:
-        # get IPs and Whois info
-        detective.get_ips_whois(pot, verbosity)
-        
-        # digest current data
-        detective.full_data_digest(pot, verbosity)
-
-        # run cname/header checks on domains without CDNs
-        detective.extra_checks(pot, timeout, user_agent, verbosity)
-
-        # digest remaining data
-        detective.full_data_digest(pot, verbosity)
-
-    except Exception as e:
-        # Incase some uncaught error somewhere
-        if interactive or verbosity:
-            print(f"An unusual exception has occurred:\n{e}")
-        return 1
-
-    # Return 0 for success
-    return 0
-
 class Chef:
     """Chef will run analysis on the domains in the DomainPot."""
 
@@ -190,6 +124,7 @@ class Chef:
             results = {
                 executor.submit(
                     chef_ip_executor,
+                    self,
                     self.pot,
                     self.timeout,
                     self.agent,
@@ -213,9 +148,12 @@ class Chef:
 
     def has_cdn(self):
         """For each domain, check if domain contains CDNS. If so, tick cdn_present to true."""
+        cdn_count = 0
         for domain in self.pot.domains:
             if len(domain.cdns) > 0:
                 domain.cdn_present = True
+                cdn_count += 1
+        print(len(self.pot.domains), ", cdn count:", cdn_count)
 
     def run_checks(self, double: bool = False) -> int:
         """Run analysis on the internal domain pool using detectCDN library."""
@@ -232,6 +170,84 @@ class Chef:
         #     self.has_cdn()
         
         return cnt
+
+def chef_executor(
+    domain: detectCDN.Domain,
+    timeout: int,
+    user_agent: str,
+    verbosity: bool,
+    interactive: bool,
+):
+    """Attempt to make the method "threadsafe" by giving each worker its own detector."""
+    # Define detector
+    detective = detectCDN.cdnCheck()
+
+    # Run checks
+    try:
+        if not domain.cdn_present:
+            detective.all_checks(
+                # Timeout is split by .4 so that each chunk can only take less than half.
+                domain,
+                verbose=verbosity,
+                timeout=math.ceil(timeout * 0.4),
+                agent=user_agent,
+                interactive=interactive,
+            )
+    except Exception as e:
+        # Incase some uncaught error somewhere
+        if interactive or verbosity:
+            print(f"An unusual exception has occurred:\n{e}")
+        return 1
+
+    # Return 0 for success
+    return 0
+
+def chef_ip_executor(
+    self: Chef,
+    pot: detectCDN.DomainPot,
+    timeout: int,
+    user_agent: str,
+    verbosity: bool,
+    interactive: bool,
+):
+    """Attempt to make the method "threadsafe" by giving each worker its own detector."""
+    # Define detector
+    detective = detectCDN.cdnCheck()
+
+    # Run checks
+    try:
+        # get IPs and Whois info
+        detective.get_ips_whois(pot, verbosity)
+
+        print("full data digest now")
+        
+        # digest current data
+        detective.full_data_digest(pot, verbosity)
+
+        self.has_cdn()
+
+        # print("extra checks now")
+
+        # # run cname/header checks on domains without CDNs
+        # detective.extra_checks(pot, timeout, user_agent, verbosity)
+
+        # print("full data digest again")
+
+        # # digest remaining data
+        # detective.full_data_digest(pot, verbosity)
+
+        # self.has_cdn()
+
+        print("digested")
+
+    except Exception as e:
+        # Incase some uncaught error somewhere
+        if interactive or verbosity:
+            print(f"An unusual exception has occurred:\n{e}")
+        return 1
+
+    # Return 0 for success
+    return 0
 
 
 def run_checks(
