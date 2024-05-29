@@ -219,24 +219,24 @@ def chef_ip_executor(
         # get IPs and Whois info
         detective.get_ips_whois(pot, verbosity)
 
-        print("full data digest now")
+        # print("full data digest now")
         
-        # digest current data
-        detective.full_data_digest(pot, verbosity)
-
-        self.has_cdn()
-
-        # print("extra checks now")
-
-        # # run cname/header checks on domains without CDNs
-        # detective.extra_checks(pot, timeout, user_agent, verbosity)
-
-        # print("full data digest again")
-
-        # # digest remaining data
+        # # digest current data
         # detective.full_data_digest(pot, verbosity)
 
         # self.has_cdn()
+
+        print("extra checks now")
+
+        # run cname/header checks on domains without CDNs
+        detective.extra_checks(pot, timeout, user_agent, verbosity)
+
+        print("full data digest again")
+
+        # digest remaining data
+        detective.full_data_digest(pot, verbosity)
+
+        self.has_cdn()
 
         print("digested")
 
