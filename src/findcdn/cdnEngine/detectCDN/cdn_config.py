@@ -186,6 +186,7 @@ CDNs = {
     "virtuozzo": "Virtuozzo",
     "ovhcloud": "OVHCloud",
     "edg.io": "edgeio",
+    "maxcdn": "maxcdn",
 }
 
 """

@@ -80,7 +80,7 @@ def test_https_lookup():
         "google.com", list(), list(), list(), list(), list(), list(), list()
     )
     check = cdnCheck()
-    check.https_lookup(
+    check.headers_lookup(
         dom_in, timeout=TIMEOUT, agent=USER_AGENT, interactive=False, verbose=False
     )
 
@@ -100,7 +100,7 @@ def test_broken_https_lookup():
         list(),
     )
     check = cdnCheck()
-    check.https_lookup(
+    check.headers_lookup(
         dom_in, timeout=TIMEOUT, agent=USER_AGENT, interactive=False, verbose=False
     )
     assert len(dom_in.headers) <= 0, "There should be no response."

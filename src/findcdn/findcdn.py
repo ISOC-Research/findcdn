@@ -118,6 +118,8 @@ def main(
                     "cnames": str(domain.cnames)[1:-1],
                     "cnames_cdns": str(domain.cnames_cdns)[1:-1],
                     "headers": str(domain.headers)[1:-1],
+                    "page_links": str([x for x in domain.page_links if len(domain.page_links_cdns)>0])[1:-1],
+                    "page_links_cdns": str(domain.page_links_cdns)[1:-1],
                     "namesrvs": str(domain.namesrvs)[1:-1],
                     "cymru_whois_data": str(domain.cymru_whois_data)[1:-1],
                     "cymru_cdn_names": str(domain.cymru_cdn_names)[1:-1],
