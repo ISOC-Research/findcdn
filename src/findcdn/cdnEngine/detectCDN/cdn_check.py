@@ -310,11 +310,11 @@ class cdnCheck:
             # add all external links to the array
             for link in links:
                 href = link.get("href")
-                if href.startswith("http"):
+                if href is not None and href.startswith("http"):
                     dom["page_links"].append(href)
         except Exception as e:
             # if interactive or verbose:
-            print(f'[{e}]: https://{dom["url"]}')
+            print(f'[{dom["url"]}]: {e}')
         return 0
     
     def cymru_lookup(self, dom: dict, interactive: bool, verbose: bool) -> int | None:
@@ -388,7 +388,7 @@ class cdnCheck:
                 pass
             except Exception as e:
                 if interactive or verbose:
-                    print(f'[{e}]: {dom["url"]} for {ip}')
+                    print(f'[{dom["url"]} for {ip}]: {e}')
         for data in whois_data:
             if data not in dom["whois_data"]:
                 dom["whois_data"].append(data)
