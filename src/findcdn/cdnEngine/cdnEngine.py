@@ -150,8 +150,8 @@ class Chef:
         """For each domain, check if domain contains CDNS. If so, tick cdn_present to true."""
         cdn_count = 0
         for domain in self.pot.domains:
-            if len(domain.cdns) > 0:
-                domain.cdn_present = True
+            if len(domain["cdns"]) > 0:
+                domain["cdn_present"] = True
                 cdn_count += 1
         print(len(self.pot.domains), ", cdn count:", cdn_count)
 
@@ -172,7 +172,7 @@ class Chef:
         return cnt
 
 def chef_executor(
-    domain: detectCDN.Domain,
+    domain: dict,
     timeout: int,
     user_agent: str,
     verbosity: bool,
@@ -184,7 +184,7 @@ def chef_executor(
 
     # Run checks
     try:
-        if not domain.cdn_present:
+        if not domain["cdn_present"]:
             detective.all_checks(
                 # Timeout is split by .4 so that each chunk can only take less than half.
                 domain,
@@ -251,7 +251,7 @@ def run_checks(
     interactive: bool = False,
     verbose: bool = False,
     double: bool = False,
-) -> Tuple[List[detectCDN.Domain], int]:
+) -> Tuple[List[dict], int]:
     """Orchestrate the use of DomainPot and Chef."""
     # Our domain pot
     dp = detectCDN.DomainPot(domains)

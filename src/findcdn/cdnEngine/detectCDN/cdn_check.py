@@ -29,59 +29,37 @@ from .cdn_err import NoIPaddress
 # Global variables
 LIFETIME = 10
 
-class Domain:
-    """Domain class allows for storage of metadata on domain."""
-
-    def __init__(
-        self,
-        url: str,
-        ip: List[str] = [],
-        cnames: List[str] = [],
-        cnames_cdns: List[str] = [],
-        cdns: List[str] = [],
-        cdns_by_name: List[str] = [],
-        namsrvs: List[str] = [],
-        headers: List[str] = [],
-        headers_cdns: List[str] = [],
-        page_links: List[str] = [],
-        page_links_cdns: List[str] = [],
-        whois_data: List[str] = [],
-        cymru_whois_data: List[str] = [],
-        cymru_cdn_names: List[str] = [],
-        cymru_data: List[List[str]] = [],
-    ):
-        """Initialize object to store metadata on domain in url."""
-        self.url = url
-        self.ip = ip
-        self.cnames = cnames
-        self.cnames_cdns = cnames_cdns
-        self.cdns = cdns
-        self.cdns_by_name = cdns_by_name
-        self.namesrvs = namsrvs
-        self.headers = headers
-        self.headers_cdns = headers_cdns
-        self.page_links = page_links
-        self.page_links_cdns = page_links_cdns
-        self.whois_data = whois_data
-        self.cymru_whois_data = cymru_whois_data
-        self.cymru_data = cymru_data
-        self.cymru_cdn_names = cymru_cdn_names
-        self.not_cymru_cdn = False
-        self.cdn_present = False
-
 class DomainPot:
     """DomainPot defines the "pot" which Domain objects are stored."""
 
     def __init__(self, domains: List[str]):
         """Define the pot for the Chef to use."""
-        self.domains: List[Domain] = []
+        self.domains: List[dict] = []
         self.ips: Dict[str,List[str]] = {}
 
         # Convert to list of type domain
         for dom in domains:
-            dom_in = Domain(
-                dom, list(), list(), list(), list(), list(), list(), list(), list(), list(), list(), list(),  list(), list(), list()
-            )
+            dom_in = {
+                "url": dom,
+                "ip": [],
+                "cdns": [],
+                "cdns_by_name": [],
+                "not_cymru_cdn": False,
+                "cdn_present": False,
+                # measurement results
+                "cnames": [],
+                "cnames_cdns": [],
+                "headers": [],
+                "headers_cdns": [],
+                "page_links": [],
+                "page_links_cdns": [],
+                "cymru_whois_data": [],
+                "cymru_cdn_names": [],
+                "cymru_data": [],
+                # legacy keys
+                "whois_data": [],
+                "namesrvs": [],
+            }
             self.domains.append(dom_in)
 
 class cdnCheck:
@@ -97,9 +75,9 @@ class cdnCheck:
         # get all IPs
         lookupIPs = []
         for dom in pot.domains:
-            if not dom.cdn_present:
+            if not dom["cdn_present"]:
                 self.ip(dom)
-                for ip in dom.ip:
+                for ip in dom["ip"]:
                     if ip not in pot.ips.keys():
                         pot.ips[ip] = []
                         lookupIPs.append(ip)
@@ -118,11 +96,11 @@ class cdnCheck:
         # build the content
         tc_content = "begin\n"
         for ip in lookupIPs:
-            tc_content += f"{ip}\n"
+            tc_content += f'{ip}\n'
         tc_content += "255.255.255.255\nend"
 
         # run the whois lookup
-        print(f"Running team-cymru query for {len(lookupIPs)} IPs")
+        print(f'Running team-cymru query for {len(lookupIPs)} IPs')
         
         # run the query
         tc_response = netcat("whois.cymru.com", 43, tc_content.encode())
@@ -142,19 +120,19 @@ class cdnCheck:
 
         # re-assign the whois info to each domain
         for dom in pot.domains:
-            if not dom.cdn_present:
-                for ip in dom.ip:
+            if not dom["cdn_present"]:
+                for ip in dom["ip"]:
                     # get the whois info
                     whois = pot.ips[ip]
                     # print(whois)
                     if len(whois)>2:
-                        if whois[2] is not None and whois[2] not in dom.cymru_whois_data:
-                            dom.cymru_whois_data.append(whois[2])
+                        if whois[2] is not None and whois[2] not in dom["cymru_whois_data"]:
+                            dom["cymru_whois_data"].append(whois[2])
 
                         # assign the full results to the domain
-                        dom.cymru_data.append(whois)
-                # if len(dom.cymru_whois_data) > 0 and not None:
-                #     self.id_cdn(dom, dom.cymru_whois_data, "cymru_whois_data")
+                        dom["cymru_data"].append(whois)
+                # if len(dom["cymru_whois_data"]) > 0 and not None:
+                #     self.id_cdn(dom, dom["cymru_whois_data"], "cymru_whois_data")
                 print(getattr(dom, "cymru_whois_data",None))
         end_time_reassign = time()
 
@@ -166,22 +144,22 @@ class cdnCheck:
         return_code = 1
         for dom in pot.domains:
             # if there are no CDNs, digest data
-            if not dom.cdn_present:
+            if not dom["cdn_present"]:
                 # Iterate through all attributes for substrings
-                if len(dom.cymru_whois_data) > 0 and not None:
-                    self.id_cdn(dom, dom.cymru_whois_data, "cymru_whois_data")
+                if len(dom["cymru_whois_data"]) > 0 and not None:
+                    self.id_cdn(dom, dom["cymru_whois_data"], "cymru_whois_data")
                     return_code = 0
-                if len(dom.cnames) > 0 and not None:
-                    self.id_cdn(dom, dom.cnames, "cnames")
+                if len(dom["cnames"]) > 0 and not None:
+                    self.id_cdn(dom, dom["cnames"], "cnames")
                     return_code = 0
-                if len(dom.headers) > 0 and not None:
-                    self.id_cdn(dom, dom.headers, "headers")
+                if len(dom["headers"]) > 0 and not None:
+                    self.id_cdn(dom, dom["headers"], "headers")
                     return_code = 0
-                if len(dom.page_links) > 0 and not None:
-                    self.id_cdn(dom, dom.page_links, "page_links")
+                if len(dom["page_links"]) > 0 and not None:
+                    self.id_cdn(dom, dom["page_links"], "page_links")
                     return_code = 0
-                if len(dom.namesrvs) > 0 and not None:
-                    self.id_cdn(dom, dom.namesrvs, "namesrvs")
+                if len(dom["namesrvs"]) > 0 and not None:
+                    self.id_cdn(dom, dom["namesrvs"], "namesrvs")
                     return_code = 0
         return return_code
     
@@ -200,7 +178,7 @@ class cdnCheck:
             extra_count += 1
             start_cname = time()
             # if the CNAME lookup hasn't been successful
-            if len(dom.cnames) == 0:
+            if len(dom["cnames"]) == 0:
                 self.cname(dom, timeout)
             finish_cname = time()
 
@@ -228,7 +206,7 @@ class cdnCheck:
             # check whether there is a tie
 
             # # if the headers lookup hasn't been done
-            if len(dom.headers) == 0:
+            if len(dom["headers"]) == 0:
                 self.headers_lookup(dom, timeout, agent, False, verbose)
         
         finish_tiebreak = time()
@@ -237,9 +215,9 @@ class cdnCheck:
         # Return to calling function
         return 0
     
-    def ip(self, dom: Domain) -> List[int]:
+    def ip(self, dom: dict) -> List[int]:
         """Determine IP addresses the domain resolves to."""
-        dom_list: List[str] = [dom.url, "www." + dom.url]
+        dom_list: List[str] = [dom["url"], "www." + dom["url"]]
         return_codes = []
         ip_list = []
         for domain in dom_list:
@@ -252,7 +230,7 @@ class cdnCheck:
                 response = resolver.resolve(domain)
                 # Assign any found IP addresses to the object
                 for ip in response:
-                    if str(ip.address) not in ip_list and str(ip.address) not in dom.ip:
+                    if str(ip.address) not in ip_list and str(ip.address) not in dom["ip"]:
                         ip_list.append(str(ip.address))
             except NoAnswer:
                 return_codes.append(1)
@@ -265,14 +243,14 @@ class cdnCheck:
 
         # Append all addresses into IP_list
         for addr in ip_list:
-            dom.ip.append(addr)
+            dom["ip"].append(addr)
         # Return listing of error codes
         return return_codes
 
-    def cname(self, dom: Domain, timeout: int) -> List[int]:
+    def cname(self, dom: dict, timeout: int) -> List[int]:
         """Collect CNAME records on domain."""
         # List of domains to check
-        dom_list = [dom.url, "www." + dom.url]
+        dom_list = [dom["url"], "www." + dom["url"]]
         # Our codes to return
         return_code = []
         # Seutp resolver and timeouts
@@ -285,7 +263,7 @@ class cdnCheck:
         for domain in dom_list:
             try:
                 response = cname_query(domain, "cname")
-                dom.cnames = [record.to_text() for record in response]
+                dom["cnames"] = [record.to_text() for record in response]
             except NoAnswer:
                 return_code.append(1)
             except NoNameservers:
@@ -297,12 +275,12 @@ class cdnCheck:
         return return_code
 
     def headers_lookup(
-        self, dom: Domain, timeout: int, agent: str, interactive: bool, verbose: bool
+        self, dom: dict, timeout: int, agent: str, interactive: bool, verbose: bool
     ) -> int:
         """Read 'server' and 'via' header for CDN hints."""
         try:
             # get the domain
-            response = get(f"https://{dom.url}", headers={"User-Agent": agent}, timeout=timeout)
+            response = get(f'https://{dom["url"]}', headers={"User-Agent": agent}, timeout=timeout)
 
             # Define headers to check for the response
             # to grab strings for later parsing.
@@ -310,9 +288,9 @@ class cdnCheck:
                 if (
                     value in response.headers.keys() 
                     and response.headers[value] is not None
-                    and response.headers[value] not in dom.headers
+                    and response.headers[value] not in dom["headers"]
                 ):
-                    dom.headers.append(response.headers[value])
+                    dom["headers"].append(response.headers[value])
             
             # parse the response HTML
             soup = BeautifulSoup(response.content, 'html.parser')
@@ -324,18 +302,18 @@ class cdnCheck:
             for link in links:
                 href = link.get("href")
                 if href.startswith("http"):
-                    dom.page_links.append(href)
+                    dom["page_links"].append(href)
         except Exception as e:
             # if interactive or verbose:
-            print(f"[{e}]: https://{dom.url}")
+            print(f'[{e}]: https://{dom["url"]}')
         return 0
     
-    def cymru_lookup(self, dom: Domain, interactive: bool, verbose: bool) -> int | None:
+    def cymru_lookup(self, dom: dict, interactive: bool, verbose: bool) -> int | None:
         if interactive or verbose:
-            print(f"Running team-cymru query for {dom.url}, {len(dom.ip)} IPs")
+            print(f'Running team-cymru query for {dom["url"]}, {len(dom["ip"])} IPs')
 
         # if there are no IPs, do not run
-        if len(dom.ip) == 0:
+        if len(dom["ip"]) == 0:
             print("No IPs, skipping")
             return None
         
@@ -345,8 +323,8 @@ class cdnCheck:
         
         # build the content
         tc_content = "begin\n"
-        for ip in dom.ip:
-            tc_content += f"{ip}\n"
+        for ip in dom["ip"]:
+            tc_content += f'{ip}\n'
         tc_content += "255.255.255.255\nend"
 
         # run the query
@@ -358,26 +336,26 @@ class cdnCheck:
 
             # reduce the cymru results into whois-style responses for FindCDN
             for res in temp_cymru:
-                if res[2] is not None and res[2] not in dom.cymru_whois_data:
-                    dom.cymru_whois_data.append(res[2])
+                if res[2] is not None and res[2] not in dom["cymru_whois_data"]:
+                    dom["cymru_whois_data"].append(res[2])
             
             # assign the full results to the domain
-            dom.cymru_data = temp_cymru
+            dom["cymru_data"] = temp_cymru
 
         return 0
     
-    def whois(self, dom: Domain, interactive: bool, verbose: bool) -> int:
+    def whois(self, dom: dict, interactive: bool, verbose: bool) -> int:
         """Scrape WHOIS data for the org or asn_description."""
         # Make sure we have Ip addresses to check
         try:
-            if len(dom.ip) <= 0:
+            if len(dom["ip"]) <= 0:
                 raise NoIPaddress
         except NoIPaddress:
             return 1
         # Define temp list to assign
         whois_data = []
         # Iterate through all the IP addresses in object
-        for ip in dom.ip:
+        for ip in dom["ip"]:
             try:
                 response = IPWhois(ip)
                 # These two should be where we can find substrings hinting to CDN
@@ -401,14 +379,14 @@ class cdnCheck:
                 pass
             except Exception as e:
                 if interactive or verbose:
-                    print(f"[{e}]: {dom.url} for {ip}")
+                    print(f'[{e}]: {dom["url"]} for {ip}')
         for data in whois_data:
-            if data not in dom.whois_data:
-                dom.whois_data.append(data)
+            if data not in dom["whois_data"]:
+                dom["whois_data"].append(data)
         # Everything was successful
         return 0
 
-    def id_cdn(self, dom: Domain, data_blob: List, list_type: str):
+    def id_cdn(self, dom: dict, data_blob: List, list_type: str):
         """
         Identify any CDN name in list received.
 
@@ -424,74 +402,74 @@ class cdnCheck:
             for url in CDNs:
                 if (
                     url.lower().replace(" ", "") in data.lower().replace(" ", "")
-                    and url not in dom.cdns
+                    and url not in dom["cdns"]
                 ):
-                    dom.cdns.append(url)
-                    dom.cdns_by_name.append(CDNs[url])
+                    dom["cdns"].append(url)
+                    dom["cdns_by_name"].append(CDNs[url])
                     if list_type != "cymru_whois_data":
-                        dom.not_cymru_cdn = True
-                if url.lower().replace(" ", "") in data.lower().replace(" ", "") and list_type == "cnames" and CDNs[url] not in dom.cnames_cdns:
-                    dom.cnames_cdns.append(CDNs[url])
-                if url.lower().replace(" ", "") in data.lower().replace(" ", "") and list_type == "cymru_whois_data" and CDNs[url] not in dom.cymru_cdn_names:
-                    dom.cymru_cdn_names.append(CDNs[url])
-                # if url.lower().replace(" ", "") in data.lower().replace(" ", "") and list_type == "page_links" and CDNs[url] not in dom.page_links:
-                #     dom.page_links_cdns.append(CDNs[url])
+                        dom["not_cymru_cdn"] = True
+                if url.lower().replace(" ", "") in data.lower().replace(" ", "") and list_type == "cnames" and CDNs[url] not in dom["cnames_cdns"]:
+                    dom["cnames_cdns"].append(CDNs[url])
+                if url.lower().replace(" ", "") in data.lower().replace(" ", "") and list_type == "cymru_whois_data" and CDNs[url] not in dom["cymru_cdn_names"]:
+                    dom["cymru_cdn_names"].append(CDNs[url])
+                # if url.lower().replace(" ", "") in data.lower().replace(" ", "") and list_type == "page_links" and CDNs[url] not in dom["page_links"]:
+                #     dom["page_links"]_cdns.append(CDNs[url])
 
             # Check the CDNs reverse list
             for name in CDNs_rev:
-                if name.lower() in data.lower() and CDNs_rev[name] not in dom.cdns:
-                    dom.cdns.append(CDNs_rev[name])
-                    dom.cdns_by_name.append(name)
+                if name.lower() in data.lower() and CDNs_rev[name] not in dom["cdns"]:
+                    dom["cdns"].append(CDNs_rev[name])
+                    dom["cdns_by_name"].append(name)
                     if list_type != "cymru_whois_data":
-                        dom.not_cymru_cdn = True
-                if name.lower() in data.lower() and list_type == "cnames" and name not in dom.cnames_cdns:
-                    dom.cnames_cdns.append(name)
-                if name.lower() in data.lower() and list_type == "cymru_whois_data" and name not in dom.cymru_cdn_names:
-                    dom.cymru_cdn_names.append(name)
-                # if url.lower().replace(" ", "") in data.lower().replace(" ", "") and list_type == "page_links" and name not in dom.page_links:
-                #     dom.page_links_cdns.append(name)
+                        dom["not_cymru_cdn"] = True
+                if name.lower() in data.lower() and list_type == "cnames" and name not in dom["cnames_cdns"]:
+                    dom["cnames_cdns"].append(name)
+                if name.lower() in data.lower() and list_type == "cymru_whois_data" and name not in dom["cymru_cdn_names"]:
+                    dom["cymru_cdn_names"].append(name)
+                # if url.lower().replace(" ", "") in data.lower().replace(" ", "") and list_type == "page_links" and name not in dom["page_links"]:
+                #     dom["page_links"]_cdns.append(name)
 
             # Check the CDNs Common list:
             # for name in COMMON.keys():
             #     if (
             #         name.lower().replace(" ", "") in data.lower().replace(" ", "")
-            #         and CDNs_rev[name] not in dom.cdns
+            #         and CDNs_rev[name] not in dom["cdns"]
             #     ):
-            #         dom.cdns.append(CDNs_rev[name])
-            #         dom.cdns_by_name.append(name)
+            #         dom["cdns"].append(CDNs_rev[name])
+            #         dom["cdns_by_name"].append(name)
             #         if list_type != "cymru_whois_data":
-            #             dom.not_cymru_cdn = True
-            #     if name.lower().replace(" ", "") in data.lower().replace(" ", "") and list_type == "cnames" and name not in dom.cnames_cdns:
-            #         dom.cnames_cdns.append(name)
-            #     if name.lower().replace(" ", "") in data.lower().replace(" ", "") and list_type == "cymru_whois_data" and name not in dom.cymru_cdn_names:
-            #         dom.cymru_cdn_names.append(name)
-            #     # if url.lower().replace(" ", "") in data.lower().replace(" ", "") and list_type == "page_links" and name not in dom.page_links:
-            #     #     dom.page_links_cdns.append(name)
+            #             dom["not_cymru_cdn"] = True
+            #     if name.lower().replace(" ", "") in data.lower().replace(" ", "") and list_type == "cnames" and name not in dom["cnames"]_cdns:
+            #         dom["cnames"]_cdns.append(name)
+            #     if name.lower().replace(" ", "") in data.lower().replace(" ", "") and list_type == "cymru_whois_data" and name not in dom["cymru_cdn_names"]:
+            #         dom["cymru_cdn_names"].append(name)
+            #     # if url.lower().replace(" ", "") in data.lower().replace(" ", "") and list_type == "page_links" and name not in dom["page_links"]:
+            #     #     dom["page_links"]_cdns.append(name)
 
-    def data_digest(self, dom: Domain) -> int:
+    def data_digest(self, dom: dict) -> int:
         """Digest all data collected and assign to CDN list."""
         return_code = 1
         # Iterate through all attributes for substrings
-        if len(dom.cnames) > 0 and not None:
-            self.id_cdn(dom, dom.cnames, "cnames")
+        if len(dom["cnames"]) > 0 and not None:
+            self.id_cdn(dom, dom["cnames"], "cnames")
             return_code = 0
-        if len(dom.headers) > 0 and not None:
-            self.id_cdn(dom, dom.headers, "headers")
+        if len(dom["headers"]) > 0 and not None:
+            self.id_cdn(dom, dom["headers"], "headers")
             return_code = 0
-        if len(dom.namesrvs) > 0 and not None:
-            self.id_cdn(dom, dom.namesrvs, "namesrvs")
+        if len(dom["namesrvs"]) > 0 and not None:
+            self.id_cdn(dom, dom["namesrvs"], "namesrvs")
             return_code = 0
-        if len(dom.whois_data) > 0 and not None:
-            self.id_cdn(dom, dom.whois_data, "whois_data")
+        if len(dom["whois_data"]) > 0 and not None:
+            self.id_cdn(dom, dom["whois_data"], "whois_data")
             return_code = 0
-        if len(dom.cymru_whois_data) > 0 and not None:
-            self.id_cdn(dom, dom.cymru_whois_data, "cymru_whois_data")
+        if len(dom["cymru_whois_data"]) > 0 and not None:
+            self.id_cdn(dom, dom["cymru_whois_data"], "cymru_whois_data")
             return_code = 0
         return return_code
 
     def all_checks(
         self,
-        dom: Domain,
+        dom: dict,
         timeout: int,
         agent: str,
         verbose: bool = False,
@@ -510,10 +488,10 @@ class cdnCheck:
 
         # Extra case if we want verbosity for each domain check
         if verbose:
-            if len(dom.cdns) > 0:
-                print(f"{dom.url} has the following CDNs:\n{dom.cdns}")
+            if len(dom["cdns"]) > 0:
+                print(f'{dom["url"]} has the following CDNs:\n{dom["cdns"]}')
             else:
-                print(f"{dom.url} does not use a CDN")
+                print(f'{dom["url"]} does not use a CDN')
 
         # Return to calling function
         return return_code
