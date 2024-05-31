@@ -110,33 +110,26 @@ def main(
 
         # Setup formatting for json output
         if len(domain["cdns"]) > 0 or all_domains:
-            # if domain["not_cymru_cdn"] or not domain["cdn_present"]:
-                domain_dict[domain["url"]] = {
-                    "IP": str(domain["ip"])[1:-1],
-                    "cdns": str(domain["cdns"])[1:-1],
-                    "cdns_by_names": str(domain["cdns_by_name"])[1:-1],
-                    "cnames": str(domain["cnames"])[1:-1],
-                    "cnames_cdns": str(domain["cnames_cdns"])[1:-1],
-                    "headers": str(domain["headers"])[1:-1],
-                    "page_links": str([x for x in domain["page_links"] if len(domain["page_links_cdns"])>0])[1:-1],
-                    "page_links_cdns": str(domain["page_links_cdns"])[1:-1],
-                    "namesrvs": str(domain["namesrvs"])[1:-1],
-                    "cymru_whois_data": str(domain["cymru_whois_data"])[1:-1],
-                    "cymru_cdn_names": str(domain["cymru_cdn_names"])[1:-1],
-                }
-            # else:
-            #     domain_dict[domain["url"]] = {
-            #         "IP": str(domain["ip"])[1:-1],
-            #         "cdns": str(domain["cdns"])[1:-1],
-            #         "cdns_by_names": str(domain["cdns_by_name"])[1:-1],
-            #         "cymru_whois_data": str(domain["cymru_whois_data"])[1:-1],
-            #     }
+            domain_dict[domain["url"]] = {
+                "ips": str(domain["ips"])[1:-1],
+                "cdns": str(domain["cdns"])[1:-1],
+                "cdns_by_names": str(domain["cdns_by_name"])[1:-1],
+                "cnames": str(domain["cnames"])[1:-1],
+                "cnames_cdns": str(domain["cnames_cdns"])[1:-1],
+                "headers": str(domain["headers"])[1:-1],
+                "headers_cdns": str(domain["headers_cdns"])[1:-1],
+                "page_links_relevant": str(domain["page_links_relevant"])[1:-1],
+                "page_links_cdns": str(domain["page_links_cdns"])[1:-1],
+                "cymru_whois": str(domain["cymru_whois"])[1:-1],
+                "cymru_whois_cdns": str(domain["cymru_whois_cdns"])[1:-1],
+                "cdns": [],
+            }
 
     # Create JSON from the results and return (results, successful jobs)
     json_dict = {}
     json_dict["date"] = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
     json_dict["cdn_count"] = str(CDN_count)
-    json_dict["domains"] = domain_dict  # type: ignore
+    json_dict["domains"] = domain_dict
     json_dump = json.dumps(json_dict, indent=4, sort_keys=False)
 
     # Show the dump to stdout if verbose or interactive

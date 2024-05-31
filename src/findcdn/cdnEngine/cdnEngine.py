@@ -103,7 +103,7 @@ class Chef:
         # Return the amount of jobs done and error code
         return job_count
     
-    def grab_ips(self):  # type: ignore
+    def grab_ips(self):
         """Get IPs for all domains."""
         # Use Concurrent futures to multithread with pools
         job_count = 0
@@ -224,10 +224,13 @@ def chef_ip_executor(
         # run cname checks on domains without CDNs
         detective.cname_lookup(pot, timeout, user_agent, verbosity)
 
-        print("full data digest")
+        # tiebreak check
+        detective.tiebreak_check(pot, timeout, user_agent, verbosity)
+
+        # print("full data digest")
 
         # digest remaining data
-        detective.full_data_digest(pot, verbosity)
+        # detective.full_data_digest(pot, verbosity)
 
         self.has_cdn()
 
@@ -235,8 +238,8 @@ def chef_ip_executor(
 
     except Exception as e:
         # Incase some uncaught error somewhere
-        if interactive or verbosity:
-            print(f"An unusual exception has occurred:\n{e}")
+        # if interactive or verbosity:
+        print(f"Exception: {e}")
         return 1
 
     # Return 0 for success
