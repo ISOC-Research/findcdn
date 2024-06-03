@@ -22,7 +22,6 @@ from urllib3.util.retry import Retry
 from dns.resolver import NXDOMAIN, NoAnswer, NoNameservers, Resolver, Timeout, query
 from ipwhois import HTTPLookupError, IPDefinedError, IPWhois
 from ipwhois.exceptions import ASNRegistryError
-from bs4 import BeautifulSoup
 
 # Internal Libraries
 from .cdn_config import COMMON, CDNs, CDNs_rev
