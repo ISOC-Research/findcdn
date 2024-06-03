@@ -43,7 +43,7 @@ findcdn list github.com
 Alternatively you can install quickly to any project with:
 
 ```console
-pip install git+https://github.com/cisagov/findcdn.git
+pip install git+https://github.com/isoc-research/findcdn.git
 ```
 
 **Note:** It is recommended to use a python virtual environment to install
