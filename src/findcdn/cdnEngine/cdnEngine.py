@@ -147,11 +147,10 @@ class Chef:
         return job_count
 
     def has_cdn(self):
-        """For each domain, check if domain contains CDNS. If so, tick cdn_present to true."""
+        """For each domain, check if domain contains CDNS."""
         cdn_count = 0
         for domain in self.pot.domains:
-            if len(domain["cdns"]) > 0:
-                domain["cdn_present"] = True
+            if len(domain["cdns_by_names"]) > 0:
                 cdn_count += 1
         print(len(self.pot.domains), ", cdn count:", cdn_count)
 
@@ -184,7 +183,7 @@ def chef_executor(
 
     # Run checks
     try:
-        if not domain["cdn_present"]:
+        if len(domain["cdns_by_names"]) == 0:
             detective.all_checks(
                 # Timeout is split by .4 so that each chunk can only take less than half.
                 domain,
@@ -219,20 +218,20 @@ def chef_ip_executor(
         # get IPs and Whois info
         detective.get_ips_whois(pot, verbosity)
 
-        print("extra checks")
-
         # run cname checks on domains without CDNs
         detective.cname_lookup(pot, timeout, user_agent, verbosity)
 
         # tiebreak check
         detective.tiebreak_check(pot, timeout, user_agent, verbosity)
 
-        # print("full data digest")
+        # digest data
+
+        print("full data digest")
 
         # digest remaining data
-        # detective.full_data_digest(pot, verbosity)
+        detective.full_data_digest(pot, verbosity)
 
-        self.has_cdn()
+        # self.has_cdn()
 
         print("digested")
 
