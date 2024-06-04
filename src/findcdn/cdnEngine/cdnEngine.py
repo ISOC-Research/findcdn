@@ -17,6 +17,13 @@ from tqdm import tqdm
 # Internal Libraries
 from . import detectCDN
 
+def split_list(lst, size):
+    """Returns split of input list into lists of given size"""
+    split_lists = []
+    for i in range(0, len(lst), size):
+        split_lists.append(lst[i:i + size])
+    return split_lists
+
 class Chef:
     """Chef will run analysis on the domains in the DomainPot."""
 
@@ -31,6 +38,7 @@ class Chef:
     ):
         """Give the chef the pot to use."""
         self.pot: detectCDN.DomainPot = pot
+        self.pots: list[detectCDN.DomainPot] = []
         self.pbar: tqdm = interactive
         self.verbose: bool = verbose
         self.timeout: int = timeout
@@ -111,6 +119,20 @@ class Chef:
         if self.verbose:
             # Give user information about the run:
             print(f"Using {self.threads} threads with a {self.timeout} second timeout to get IPs")
+        
+        # calculate domains per thread using a reverse floor function
+        dpt = -(len(self.pot.domains) // -self.threads)
+
+        # split the domains into multiple smaller lists corresponding to the thread count
+        lst = split_list(self.pot.domains, dpt)
+        
+        # need to loop through the domains
+        # for the domains of each list, create a new pot
+        new_pots = []
+        for dlist in lst:
+            doms = [x["url"] for x in dlist]
+            new_pots.append(detectCDN.DomainPot(doms))
+        self.pots = new_pots
 
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=self.threads
@@ -125,12 +147,13 @@ class Chef:
                 executor.submit(
                     chef_ip_executor,
                     self,
-                    self.pot,
+                    pot,
                     self.timeout,
                     self.agent,
                     self.verbose,
                     self.interactive,
                 )
+                for pot in self.pots
             }
 
             # Comb future objects for completed task pool.
@@ -264,5 +287,8 @@ def run_checks(
     # Run analysis for all domains
     cnt = chef.run_checks(double)
 
+    # convert the separate domain pots into one list for output
+    domains_results = [x for xs in chef.pots for x in xs.domains]
+
     # Return all domains in form domain_pool, count of jobs processed, error code
-    return (chef.pot.domains, cnt)
+    return (domains_results, cnt)
