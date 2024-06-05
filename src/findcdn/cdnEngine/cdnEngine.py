@@ -10,12 +10,16 @@ import concurrent.futures
 import math
 import os
 from typing import List, Tuple, Dict
+import logging
 
 # Third-Party Libraries
 from tqdm import tqdm
 
 # Internal Libraries
 from . import detectCDN
+
+# start logging
+logger = logging.getLogger(__name__)
 
 def split_list(lst, size):
     """Returns split of input list into lists of given size"""
@@ -29,129 +33,44 @@ class Chef:
 
     def __init__(
         self,
-        pot: detectCDN.DomainPot,
+        pots: list[detectCDN.DomainPot],
+        dom_count: int,
         threads: int,
         timeout: int,
         user_agent: str,
-        interactive: bool = False,
         verbose: bool = False,
     ):
         """Give the chef the pot to use."""
-        self.pot: detectCDN.DomainPot = pot
-        self.pots: list[detectCDN.DomainPot] = []
-        self.pbar: tqdm = interactive
+        self.pots: list[detectCDN.DomainPot] = pots
+        self.domain_count = dom_count
         self.verbose: bool = verbose
         self.timeout: int = timeout
         self.agent = user_agent
-        self.interactive = interactive
+        self.threads = threads
 
-        # Determine thread count
-        if threads and threads != 0:
-            # Threads defined by user assign
-            self.threads = threads
-        else:
-            # No user defined threads, get it from os.cpu_count()
-            cpu_count = os.cpu_count()
-            if cpu_count is None:
-                cpu_count = 1
-            self.threads = cpu_count  # type: ignore
-
-    def grab_cdn(self, second_run: bool = False):  # type: ignore
-        """Check for CDNs used be domain list."""
-        # Use Concurrent futures to multithread with pools
-        job_count = 0
-
-        if self.verbose and not second_run:
-            # Give user information about the run:
-            print(f"Using {self.threads} threads with a {self.timeout} second timeout")
-            print(f"User Agent: {self.agent}\n")
-
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=self.threads
-        ) as executor:
-            job_count = len(self.pot.domains)
-            # Setup pbar with correct amount size
-            if self.pbar:
-                pbar = tqdm(total=job_count)
-
-            # Assign workers and assign to results list
-            results = {
-                executor.submit(
-                    chef_executor,
-                    domain,
-                    self.timeout,
-                    self.agent,
-                    self.verbose,
-                    self.interactive,
-                )
-                for domain in self.pot.domains
-            }
-
-            # Comb future objects for completed task pool.
-            for future in concurrent.futures.as_completed(results):
-                try:
-                    # Try and grab feature result to dequeue job
-                    future.result(timeout=self.timeout)
-                except concurrent.futures.TimeoutError as e:
-                    # Tell us we dropped it. Should log this instead.
-                    if self.interactive or self.verbose:
-                        print(f"Dropped due to: {e}")
-
-                # Update status bar if allowed
-                if self.pbar:
-                    # We type ignore these as its "illegal" to access private attributes of an object
-                    pending = f"Pending: {executor._work_queue.qsize()} jobs"  # type: ignore
-                    threads = f"Threads: {len(executor._threads)}"  # type: ignore
-                    pbar.set_description(f"[{pending}]==[{threads}]")
-                    if self.pbar is not None:
-                        pbar.update(1)
-                    else:
-                        pass
-
-        # Return the amount of jobs done and error code
-        return job_count
-    
-    def grab_ips(self):
-        """Get IPs for all domains."""
+    def analyze_domains(self):
+        """Run analysis on the internal domain pool using detectCDN library."""
         # Use Concurrent futures to multithread with pools
         job_count = 0
 
         if self.verbose:
             # Give user information about the run:
             print(f"Using {self.threads} threads with a {self.timeout} second timeout to get IPs")
-        
-        # calculate domains per thread using a reverse floor function
-        dpt = -(len(self.pot.domains) // -self.threads)
-
-        # split the domains into multiple smaller lists corresponding to the thread count
-        lst = split_list(self.pot.domains, dpt)
-        
-        # need to loop through the domains
-        # for the domains of each list, create a new pot
-        new_pots = []
-        for dlist in lst:
-            doms = [x["url"] for x in dlist]
-            new_pots.append(detectCDN.DomainPot(doms))
-        self.pots = new_pots
-
+        logger.info(f"Using {self.threads} threads with a {self.timeout} second timeout to get IPs")
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=self.threads
         ) as executor:
-            job_count = len(self.pot.domains)
-            # Setup pbar with correct amount size
-            if self.pbar:
-                pbar = tqdm(total=job_count)
+            job_count = self.domain_count
 
             # Assign workers and assign to results list
             results = {
                 executor.submit(
-                    chef_ip_executor,
+                    chef_executor,
                     self,
                     pot,
                     self.timeout,
                     self.agent,
                     self.verbose,
-                    self.interactive,
                 )
                 for pot in self.pots
             }
@@ -163,74 +82,19 @@ class Chef:
                     future.result(timeout=self.timeout)
                 except concurrent.futures.TimeoutError as e:
                     # Tell us we dropped it. Should log this instead.
-                    if self.interactive or self.verbose:
+                    if self.verbose:
                         print(f"Dropped due to: {e}")
+                    logger.info(f"Dropped due to: {e}")
 
         # Return the amount of jobs done and error code
         return job_count
 
-    def has_cdn(self):
-        """For each domain, check if domain contains CDNS."""
-        cdn_count = 0
-        for domain in self.pot.domains:
-            if len(domain["cdns_by_names"]) > 0:
-                cdn_count += 1
-        print(len(self.pot.domains), ", cdn count:", cdn_count)
-
-    def run_checks(self, double: bool = False) -> int:
-        """Run analysis on the internal domain pool using detectCDN library."""
-        cnt = self.grab_ips()
-
-        if double:
-            cnt += self.grab_ips()
-        
-        # cnt = self.grab_cdn(second_run=False)
-        # self.has_cdn()
-
-        # if double:
-        #     cnt += self.grab_cdn(second_run=True)
-        #     self.has_cdn()
-        
-        return cnt
-
 def chef_executor(
-    domain: dict,
-    timeout: int,
-    user_agent: str,
-    verbosity: bool,
-    interactive: bool,
-):
-    """Attempt to make the method "threadsafe" by giving each worker its own detector."""
-    # Define detector
-    detective = detectCDN.cdnCheck()
-
-    # Run checks
-    try:
-        if len(domain["cdns_by_names"]) == 0:
-            detective.all_checks(
-                # Timeout is split by .4 so that each chunk can only take less than half.
-                domain,
-                verbose=verbosity,
-                timeout=math.ceil(timeout * 0.4),
-                agent=user_agent,
-                interactive=interactive,
-            )
-    except Exception as e:
-        # Incase some uncaught error somewhere
-        if interactive or verbosity:
-            print(f"An unusual exception has occurred:\n{e}")
-        return 1
-
-    # Return 0 for success
-    return 0
-
-def chef_ip_executor(
     self: Chef,
     pot: detectCDN.DomainPot,
     timeout: int,
     user_agent: str,
     verbosity: bool,
-    interactive: bool,
 ):
     """Attempt to make the method "threadsafe" by giving each worker its own detector."""
     # Define detector
@@ -239,7 +103,7 @@ def chef_ip_executor(
     # Run checks
     try:
         # get IPs and Whois info
-        detective.get_ips_whois(pot, verbosity)
+        detective.ip_whois_bulk_lookup(pot, verbosity)
 
         # run cname checks on domains without CDNs
         detective.cname_lookup(pot, timeout, user_agent, verbosity)
@@ -247,21 +111,14 @@ def chef_ip_executor(
         # tiebreak check
         detective.tiebreak_check(pot, timeout, user_agent, verbosity)
 
-        # digest data
-
-        print("full data digest")
-
         # digest remaining data
         detective.full_data_digest(pot, verbosity)
 
-        # self.has_cdn()
-
-        print("digested")
-
     except Exception as e:
         # Incase some uncaught error somewhere
-        # if interactive or verbosity:
-        print(f"Exception: {e}")
+        if verbosity:
+            print(f"Exception: {e}")
+        logger.error(f"Exception: {e}")
         return 1
 
     # Return 0 for success
@@ -273,22 +130,43 @@ def run_checks(
     threads: int,
     timeout: int,
     user_agent: str,
-    interactive: bool = False,
     verbose: bool = False,
     double: bool = False,
 ) -> Tuple[List[dict], int]:
     """Orchestrate the use of DomainPot and Chef."""
-    # Our domain pot
-    dp = detectCDN.DomainPot(domains)
+
+    # Determine thread count
+    if not (threads and threads != 0):
+        # No user defined threads, get it from os.cpu_count()
+        cpu_count = os.cpu_count()
+        if cpu_count is None:
+            cpu_count = 1
+        threads = cpu_count
+
+    # calculate domains per thread using a reverse floor function
+    dpt = -(len(domains) // -threads)
+
+    # split the domains into multiple smaller lists corresponding to the thread count
+    domain_lists = split_list(domains, dpt)
+    
+    # for the domains of each list, create a new pot
+    new_pots = []
+    for dom_list in domain_lists:
+        new_pots.append(detectCDN.DomainPot(dom_list))
+    pots = new_pots
 
     # Our chef to manage pot
-    chef = Chef(dp, threads, timeout, user_agent, interactive, verbose)
+    chef = Chef(pots, len(domains), threads, timeout, user_agent, verbose)
 
     # Run analysis for all domains
-    cnt = chef.run_checks(double)
+    cnt = chef.analyze_domains()
+
+    # if double, run analysis again
+    if double:
+        cnt += chef.analyze_domains()
 
     # convert the separate domain pots into one list for output
-    domains_results = [x for xs in chef.pots for x in xs.domains]
+    domains_results = [domain for pot in chef.pots for domain in pot.domains]
 
-    # Return all domains in form domain_pool, count of jobs processed, error code
+    # Return all domains in form domain_pool, job count
     return (domains_results, cnt)

@@ -113,7 +113,7 @@ def test_whois():
     )
     check = cdnCheck()
     check.ip(dom_in)
-    check.whois(dom_in, interactive=False, verbose=False)
+    check.whois_lookup_rir(dom_in, interactive=False, verbose=False)
 
     assert (
         "GOOGLE" in dom_in.whois_data
@@ -134,7 +134,7 @@ def test_broken_whois():
     )
     check = cdnCheck()
     check.ip(dom_in)
-    return_code = check.whois(dom_in, interactive=False, verbose=False)
+    return_code = check.whois_lookup_rir(dom_in, interactive=False, verbose=False)
     assert return_code != 0, "This fake site should return a non 0 code."
 
 

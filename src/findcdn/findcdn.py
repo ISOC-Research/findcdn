@@ -24,6 +24,8 @@ Options:
   -t --threads=<thread_count>  Number of threads, otherwise use default.
   --timeout=<timeout>          Max duration in seconds to wait for a domain to
                                conclude processing, otherwise use default.
+  --log_level=<log_level>      Set the log level to use, otherwise 
+                               use  default
   --user_agent=<user_agent>    Set the user agent to use, otherwise
                                use default.
 """
@@ -34,6 +36,7 @@ import json
 import os
 import sys
 from typing import Any, Dict, List
+import logging
 
 # Third-Party Libraries
 import docopt
@@ -43,15 +46,18 @@ import validators
 # Internal Libraries
 from ._version import __version__
 from .cdnEngine import run_checks
-from .findcdn_err import FileWriteError, InvalidDomain, NoDomains, OutputFileExists
+from .findcdn_err import FileWriteError, InvalidDomain, NoDomains, OutputFileExists, LogLevelError
 
 # Global Variables
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36"
 TIMEOUT = 60  # Time in seconds
 THREADS = 0  # If 0 then cdnEngine uses CPU count to set thread count
+LOG_LEVEL = "WARNING"  # If 0 then cdnEngine uses CPU count to set thread count
 
+# start logging
+logger = logging.getLogger(__name__)
 
-def write_json(json_dump: str, output: str, verbose: bool, interactive: bool):
+def write_json(json_dump: str, output: str):
     """Write dict as JSON to output file."""
     try:
         with open(output, "x") as outfile:
@@ -67,13 +73,19 @@ def main(
     output_path: str = None,
     verbose: bool = False,
     all_domains: bool = False,
-    interactive: bool = False,
     double_in: bool = False,
     threads: int = THREADS,
     timeout: int = TIMEOUT,
     user_agent: str = USER_AGENT,
+    log_level: str = LOG_LEVEL,
 ) -> str:
     """Take in a list of domains and determine the CDN for each return (JSON, number of successful jobs)."""
+
+    # start and check logging
+    if log_level.upper() not in ['DEBUG','INFO','WARNING','ERROR','CRITICAL']:
+        raise LogLevelError(log_level)
+    logging.basicConfig(level=log_level.upper())
+
     # Make sure the list passed is got something in it
     if len(domain_list) <= 0:
         raise NoDomains("error")
@@ -86,6 +98,7 @@ def main(
     # Show the validated domains if in verbose mode
     if verbose:
         print("%d Domains Validated" % len(domain_list))
+    logger.info("%d Domains Validated" % len(domain_list))
 
     # Define domain dict and counter for json
     domain_dict = {}
@@ -97,7 +110,6 @@ def main(
         threads,
         timeout,
         user_agent,
-        interactive,
         verbose,
         double_in,
     )
@@ -129,20 +141,17 @@ def main(
     json_dict["domains"] = domain_dict
     json_dump = json.dumps(json_dict, indent=4, sort_keys=False)
 
-    # Show the dump to stdout if verbose or interactive
-    if (output_path is None and interactive) or verbose:
+    # Show the dump to stdout if verbose
+    if verbose:
         print(json_dump)
+    logger.debug("Results:\n"+json_dump)
 
     # Export to file if file provided
     if output_path is not None:
-        write_json(json_dump, output_path, verbose, interactive)
-    if interactive or verbose:
-        print(
-            "Domain processing completed.\n%d domains had CDN's out of %d."
-            % (CDN_count, len(domain_list))
-        )
+        write_json(json_dump, output_path)
     if verbose:
-        print(f"{cnt} jobs completed!")
+        print("Domain processing completed. %d jobs completed.\n%d domains had CDN's out of %d." % (cnt, CDN_count, len(domain_list)))
+    logger.info("Domain processing completed. %d jobs completed.\n%d domains had CDN's out of %d." % (cnt, CDN_count, len(domain_list)))
 
     # Return json dump to callee
     return json_dump
@@ -160,6 +169,8 @@ def interactive() -> None:
         args["--threads"] = THREADS
     if args["--timeout"] is None:
         args["--timeout"] = TIMEOUT
+    if args["--log_level"] is None:
+        args["--log_level"] = LOG_LEVEL
 
     # Validate and convert arguments as needed with schema
     schema: Schema = Schema(
@@ -194,6 +205,10 @@ def interactive() -> None:
                 str,
                 error="The user agent must be a string.",
             ),
+            "--log_level": And(
+                str,
+                error="The log level must be 'debug', 'info', 'warning', 'error', or 'critical'.",
+            ),
             "<domain>": And(list, error="Please format the domains as a list."),
             str: object,  # Don't care about other keys, if any
         }
@@ -203,6 +218,7 @@ def interactive() -> None:
     except SchemaError as err:
         # Exit because one or more of the arguments were invalid
         print(err, file=sys.stderr)
+        logger.error("Argument error: %s" % err, file=sys.stderr)
         sys.exit(1)
 
     # Add domains to a list
@@ -213,6 +229,7 @@ def interactive() -> None:
                 domain_list = [line.rstrip() for line in f]
         except IOError as e:
             print("A file error occurred: %s" % e, file=sys.stderr)
+            logger.error("A file error occurred: %s" % e, file=sys.stderr)
             sys.exit(1)
     else:
         domain_list = validated_args["<domain>"]
@@ -224,22 +241,26 @@ def interactive() -> None:
             validated_args["--output"],
             validated_args["--verbose"],
             validated_args["--all"],
-            True,  # Launch in interactive mode.
             validated_args["--double"],
             validated_args["--threads"],
             validated_args["--timeout"],
             validated_args["--user_agent"],
+            validated_args["--log_level"],
         )
     # Check for all potential exceptions
     except OutputFileExists as ofe:
         print(ofe.message)
+        logger.error("Error: %s" % ofe.message)
         sys.exit(1)
     except FileWriteError as fwe:
         print(fwe.message)
+        logger.error("Error: %s" % fwe.message)
         sys.exit(2)
     except InvalidDomain as invdom:
         print(invdom.message)
+        logger.error("Error: %s" % invdom.message)
         sys.exit(3)
     except NoDomains as nd:
         print(nd.message)
+        logger.error("Error: %s" % nd.message)
         sys.exit(4)

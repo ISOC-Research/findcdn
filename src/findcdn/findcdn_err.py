@@ -39,3 +39,11 @@ class FileWriteError(Exception):
             + repr(error)
         )
         super().__init__(self.message)
+
+class LogLevelError(Exception):
+    """Raise when there is a with the log level."""
+
+    def __init__(self, erroneous_value):
+        """Instantiate super class with passed message."""
+        self.message = f"Log level '{erroneous_value}' invalid, must be one of: 'debug','info','warning','error','critical'"
+        super().__init__(self.message)

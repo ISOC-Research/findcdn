@@ -5,6 +5,7 @@ Description: The detectCDN library is meant to show what CDNs a domain may be us
 """
 
 # Standard Python Libraries
+import logging
 from http.client import RemoteDisconnected
 from ssl import CertificateError, SSLError
 from typing import List
@@ -29,6 +30,9 @@ from .cdn_err import NoIPaddress
 
 # Global variables
 LIFETIME = 10
+
+# start logging
+logger = logging.getLogger(__name__)
 
 class DomainPot:
     """DomainPot defines the "pot" which Domain objects are stored."""
@@ -66,7 +70,7 @@ class cdnCheck:
         """Initialize the orchestrator of analysis."""
         self.running = False
     
-    def get_ips_whois(self, pot: DomainPot, verbose: bool = False) -> int:
+    def ip_whois_bulk_lookup(self, pot: DomainPot, verbose: bool = False) -> int:
         """Get IP addresses for all domains and whois information, where available."""
         start_time_ip = time()
         # get all IPs
@@ -79,11 +83,11 @@ class cdnCheck:
                         pot.ips[ip] = []
                         lookupIPs.append(ip)
         end_time_ip = time()
-        print("IP lookup time:",end_time_ip-start_time_ip)
+        logger.debug(f"IP lookup time:{end_time_ip-start_time_ip}")
 
         # if there are no IPs, do not run
         if len(lookupIPs) == 0:
-            print("No IPs, skipping")
+            logger.info("No IPs, skipping")
             return None
         
         # define a temp list to assign
@@ -97,13 +101,13 @@ class cdnCheck:
         tc_content += "255.255.255.255\nend"
 
         # run the whois lookup
-        print(f'Running team-cymru query for {len(lookupIPs)} IPs')
+        logger.info(f'Running team-cymru query for {len(lookupIPs)} IPs')
         
         # run the query
         tc_response = netcat("whois.cymru.com", 43, tc_content.encode())
-        # print(tc_response)
+        
         end_time_whois = time()
-        print("Whois lookup time:",end_time_whois-end_time_ip)
+        logger.debug(f"Whois lookup time: {end_time_whois-end_time_ip}")
         # parse the results of the query, if they exist
         if tc_response:
             temp_cymru = parse_cymru_results(tc_response)
@@ -113,7 +117,7 @@ class cdnCheck:
                     # assign the data to the respective IP
                     pot.ips[data[1]] = data
             end_time_parse = time()
-        print("Whois parse time:",end_time_parse-end_time_whois)
+        logger.debug(f"Whois parse time: {end_time_parse-end_time_whois}")
 
         # re-assign the whois info to each domain
         for dom in pot.domains:
@@ -121,7 +125,6 @@ class cdnCheck:
                 for ip in dom["ips"]:
                     # get the whois info
                     whois = pot.ips[ip]
-                    # print(whois)
                     if len(whois)>2:
                         if whois[2] is not None and whois[2] not in dom["cymru_whois"]:
                             dom["cymru_whois"].append(whois[2])
@@ -133,13 +136,12 @@ class cdnCheck:
                     self.id_cdn(dom, "cymru_whois")
         end_time_reassign = time()
 
-        print("Whois reassign time:",end_time_reassign-end_time_parse)
+        logger.debug(f"Whois reassign time: {end_time_reassign-end_time_parse}")
         return 0
     
     def full_data_digest(self, pot: DomainPot, verbose: bool = False) -> int:
         """Digest all data collected and assign to CDN list."""
         return_code = 1
-        cdn_count = 0
         for dom in pot.domains:
             # if there are no CDNs for this domain, digest data
             if len(dom["cdns_by_names"])==0:
@@ -175,9 +177,7 @@ class cdnCheck:
                         dom["cdns_by_names"] = dom["cymru_whois_cdns"]
             
             if len(dom["cdns_by_names"])>0:
-                cdn_count += 1
                 return_code = 0
-        print(len(pot.domains), ", cdn count:", cdn_count)
         return return_code
     
     def cname_lookup(
@@ -205,8 +205,8 @@ class cdnCheck:
             finish_cname = time()
             total_cname_time += finish_cname-start_cname
         
-        print("total cname:",total_cname_time)
-        print("extra checks done:",extra_count)
+        logger.debug(f"Total CNAME Time: {total_cname_time}")
+        logger.info(f"Extra checks done: {extra_count}")
         # Return to calling function
         return 0
     
@@ -231,15 +231,15 @@ class cdnCheck:
                 # if the headers lookup hasn't been done
                 if len(dom["headers"]) == 0:
                     tiebreak_count += 1
-                    self.https_lookup(dom, timeout, agent, False, verbose)
+                    self.https_lookup(dom, timeout, agent, verbose)
                 
                 # classify CDNs for that domain
                 if len(dom["headers"]) > 0 and not None:
                     self.id_cdn(dom, "headers")
         
         finish_tiebreak = time()
-        print("total tiebreak time:", finish_tiebreak-start_tiebreak)
-        print("tiebreaks done:", tiebreak_count)
+        logger.debug(f"Total tiebreak time: {finish_tiebreak-start_tiebreak}")
+        logger.info(f"Tiebreaks done: {tiebreak_count}")
         # Return to calling function
         return 0
     
@@ -303,7 +303,7 @@ class cdnCheck:
         return return_code
 
     def https_lookup(
-        self, dom: dict, timeout: int, agent: str, interactive: bool, verbose: bool
+        self, dom: dict, timeout: int, agent: str, verbose: bool
     ) -> int:
         """Read 'server' and 'via' header for CDN hints."""
         try:
@@ -315,10 +315,6 @@ class cdnCheck:
 
             response = session.get(f'https://{dom["url"]}', headers={"User-Agent": agent}, timeout=timeout)
 
-
-            # get the domain
-            # response = get(f'https://{dom["url"]}', headers={"User-Agent": agent}, timeout=timeout)
-
             # Define headers to check for the response
             # to grab strings for later parsing.
             for value in ["server", "via"]:
@@ -329,86 +325,7 @@ class cdnCheck:
                 ):
                     dom["headers"].append(response.headers[value])
         except Exception as e:
-            # if interactive or verbose:
-            print(f'[{dom["url"]}]: {e}')
-        return 0
-    
-    def cymru_lookup(self, dom: dict, interactive: bool, verbose: bool) -> int | None:
-        if interactive or verbose:
-            print(f'Running team-cymru query for {dom["url"]}, {len(dom["ips"])} IPs')
-
-        # if there are no IPs, do not run
-        if len(dom["ips"]) == 0:
-            print("No IPs, skipping")
-            return None
-        
-        # define a temp list to assign
-        temp_cymru = []
-        tc_response = ""
-        
-        # build the content
-        tc_content = "begin\n"
-        for ip in dom["ips"]:
-            tc_content += f'{ip}\n'
-        tc_content += "255.255.255.255\nend"
-
-        # run the query
-        tc_response = netcat("whois.cymru.com", 43, tc_content.encode())
-
-        # parse the results of the query, if they exist
-        if tc_response:
-            temp_cymru = parse_cymru_results(tc_response)
-
-            # reduce the cymru results into whois-style responses for FindCDN
-            for res in temp_cymru:
-                if res[2] is not None and res[2] not in dom["cymru_whois"]:
-                    dom["cymru_whois"].append(res[2])
-            
-            # assign the full results to the domain
-            dom["all_cymru_data"] = temp_cymru
-
-        return 0
-    
-    def whois(self, dom: dict, interactive: bool, verbose: bool) -> int:
-        """Scrape WHOIS data for the org or asn_description."""
-        # Make sure we have Ip addresses to check
-        try:
-            if len(dom["ips"]) <= 0:
-                raise NoIPaddress
-        except NoIPaddress:
-            return 1
-        # Define temp list to assign
-        whois_data = []
-        # Iterate through all the IP addresses in object
-        for ip in dom["ips"]:
-            try:
-                response = IPWhois(ip)
-                # These two should be where we can find substrings hinting to CDN
-                try:
-                    org = response.lookup_whois()["asn_description"]
-                    if org != "BAREFRUIT-ERRORHANDLING":
-                        whois_data.append(org)
-                except AttributeError:
-                    pass
-                try:
-                    org = response.lookup_rdap()["network"]["name"]
-                    if org != "BAREFRUIT-ERRORHANDLING":
-                        whois_data.append(org)
-                except AttributeError:
-                    pass
-            except HTTPLookupError:
-                pass
-            except IPDefinedError:
-                pass
-            except ASNRegistryError:
-                pass
-            except Exception as e:
-                if interactive or verbose:
-                    print(f'[{dom["url"]} for {ip}]: {e}')
-        for data in whois_data:
-            if data not in dom["whois_data"]:
-                dom["whois_data"].append(data)
-        # Everything was successful
+            logger.warning(f'[{dom["url"]}]: {e}')
         return 0
 
     def id_cdn(self, dom: dict, list_type: str):
@@ -421,10 +338,10 @@ class cdnCheck:
         """
         # ensure the list is in the domain
         if list_type not in dom.keys():
-            print("Error:", list_type,"not in domain dict")
+            logger.warning(f"Error: {list_type} not in domain dict")
         # ensure the list_cdns is in the domain
         if list_type+"_cdns" not in dom.keys():
-            print("Error:", list_type+"_cdns not in domain dict")
+            logger.warning(f"Error: {list_type}_cdns not in domain dict")
         for data in dom[list_type]:
             # Make sure we do not try to analyze None type data
             if data is None:
@@ -437,53 +354,6 @@ class cdnCheck:
                     and name not in dom[list_type+"_cdns"]
                 ):
                     dom[list_type+"_cdns"].append(name)
-
-    def data_digest(self, dom: dict) -> int:
-        """Digest all data collected and assign to CDN list."""
-        return_code = 1
-        # Iterate through all attributes for substrings
-        if len(dom["cnames"]) > 0 and not None:
-            self.id_cdn(dom, dom["cnames"], "cnames")
-            return_code = 0
-        if len(dom["headers"]) > 0 and not None:
-            self.id_cdn(dom, dom["headers"], "headers")
-            return_code = 0
-        if len(dom["whois_data"]) > 0 and not None:
-            self.id_cdn(dom, dom["whois_data"], "whois_data")
-            return_code = 0
-        if len(dom["cymru_whois"]) > 0 and not None:
-            self.id_cdn(dom, dom["cymru_whois"], "cymru_whois")
-            return_code = 0
-        return return_code
-
-    def all_checks(
-        self,
-        dom: dict,
-        timeout: int,
-        agent: str,
-        verbose: bool = False,
-        interactive: bool = False,
-    ) -> int:
-        """Option to run everything in this library then digest."""
-        # Obtain each attributes data
-        # self.ip(dom)
-        # self.cname(dom, timeout)
-        # self.https_lookup(dom, timeout, agent, interactive, verbose)
-        # self.cymru_lookup(dom, interactive, verbose)
-        # self.whois(dom, interactive, verbose)
-
-        # Digest the data
-        return_code = self.data_digest(dom)
-
-        # Extra case if we want verbosity for each domain check
-        if verbose:
-            if len(dom["cdns_by_names"]) > 0:
-                print(f'{dom["url"]} has the following CDNs:\n{dom["cdns_by_names"]}')
-            else:
-                print(f'{dom["url"]} does not use a CDN')
-
-        # Return to calling function
-        return return_code
 
 def netcat(hostname: str, port: int, content: bytes) -> str | None:
     '''
@@ -509,10 +379,6 @@ def netcat(hostname: str, port: int, content: bytes) -> str | None:
     # close the connection
     s.shutdown(SHUT_WR)
     s.close()
-
-    # # remove byte characters from string
-    # if "'b'" in rstr:
-    #     rstr = rstr.replace("'b'","")
     
     # check that data was returned
     if len(rstr) == 0:

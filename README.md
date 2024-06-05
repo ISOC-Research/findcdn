@@ -124,7 +124,6 @@ findcdn.main(
     output_path: str = None,  # if included, output results to JSON
     verbose: bool = False,  # Verbose mode (more printing!)
     all_domains: bool = False,  # Includes domains that dont have cdn's in the output
-    interactive: bool = False,  # Includes a progress bar (normally used for command line)
     double_in: bool = False,  #D ouble the number of tries on a domain to increase accuracy
     threads: int = THREADS,  # Number of threads to use
     timeout: int = TIMEOUT,  # How long to wait on a domain
