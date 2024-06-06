@@ -187,6 +187,7 @@ CDNs = {
     "ovhcloud": "OVHCloud",
     "edg.io": "edgeio",
     "maxcdn": "maxcdn",
+    "netflix.com": "Netflix",
 }
 
 """

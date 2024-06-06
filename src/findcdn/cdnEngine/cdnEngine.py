@@ -33,7 +33,7 @@ class Chef:
 
     def __init__(
         self,
-        pots: list[detectCDN.DomainPot],
+        domains: list[str],
         dom_count: int,
         threads: int,
         timeout: int,
@@ -41,11 +41,32 @@ class Chef:
         verbose: bool = False,
     ):
         """Give the chef the pot to use."""
-        self.pots: list[detectCDN.DomainPot] = pots
         self.domain_count = dom_count
         self.verbose: bool = verbose
         self.timeout: int = timeout
         self.agent = user_agent
+
+        # Determine thread count
+        if not (threads and threads != 0):
+            # No user defined threads, get it from os.cpu_count()
+            cpu_count = os.cpu_count()
+            if cpu_count is None:
+                cpu_count = 1
+            threads = cpu_count
+
+        # calculate domains per thread using a reverse floor function
+        dpt = -(len(domains) // -threads)
+
+        # split the domains into multiple smaller lists corresponding to the thread count
+        domain_lists = split_list(domains, dpt)
+        
+        # for the domains of each list, create a new pot
+        new_pots = []
+        for dom_list in domain_lists:
+            new_pots.append(detectCDN.DomainPot(dom_list))
+        pots = new_pots
+
+        self.pots = pots
         self.threads = threads
 
     def analyze_domains(self):
@@ -135,28 +156,28 @@ def run_checks(
 ) -> Tuple[List[dict], int]:
     """Orchestrate the use of DomainPot and Chef."""
 
-    # Determine thread count
-    if not (threads and threads != 0):
-        # No user defined threads, get it from os.cpu_count()
-        cpu_count = os.cpu_count()
-        if cpu_count is None:
-            cpu_count = 1
-        threads = cpu_count
+    # # Determine thread count
+    # if not (threads and threads != 0):
+    #     # No user defined threads, get it from os.cpu_count()
+    #     cpu_count = os.cpu_count()
+    #     if cpu_count is None:
+    #         cpu_count = 1
+    #     threads = cpu_count
 
-    # calculate domains per thread using a reverse floor function
-    dpt = -(len(domains) // -threads)
+    # # calculate domains per thread using a reverse floor function
+    # dpt = -(len(domains) // -threads)
 
-    # split the domains into multiple smaller lists corresponding to the thread count
-    domain_lists = split_list(domains, dpt)
+    # # split the domains into multiple smaller lists corresponding to the thread count
+    # domain_lists = split_list(domains, dpt)
     
-    # for the domains of each list, create a new pot
-    new_pots = []
-    for dom_list in domain_lists:
-        new_pots.append(detectCDN.DomainPot(dom_list))
-    pots = new_pots
+    # # for the domains of each list, create a new pot
+    # new_pots = []
+    # for dom_list in domain_lists:
+    #     new_pots.append(detectCDN.DomainPot(dom_list))
+    # pots = new_pots
 
     # Our chef to manage pot
-    chef = Chef(pots, len(domains), threads, timeout, user_agent, verbose)
+    chef = Chef(domains, len(domains), threads, timeout, user_agent, verbose)
 
     # Run analysis for all domains
     cnt = chef.analyze_domains()

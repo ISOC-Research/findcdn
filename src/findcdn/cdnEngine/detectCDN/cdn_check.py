@@ -88,7 +88,7 @@ class cdnCheck:
         # if there are no IPs, do not run
         if len(lookupIPs) == 0:
             logger.info("No IPs, skipping")
-            return None
+            return 1
         
         # define a temp list to assign
         temp_cymru = []
