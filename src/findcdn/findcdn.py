@@ -218,7 +218,7 @@ def interactive() -> None:
     except SchemaError as err:
         # Exit because one or more of the arguments were invalid
         print(err, file=sys.stderr)
-        logger.error("Argument error: %s" % err, file=sys.stderr)
+        logger.error("Argument error: %s" % err)
         sys.exit(1)
 
     # Add domains to a list
@@ -229,7 +229,7 @@ def interactive() -> None:
                 domain_list = [line.rstrip() for line in f]
         except IOError as e:
             print("A file error occurred: %s" % e, file=sys.stderr)
-            logger.error("A file error occurred: %s" % e, file=sys.stderr)
+            logger.error("A file error occurred: %s" % e)
             sys.exit(1)
     else:
         domain_list = validated_args["<domain>"]

@@ -92,7 +92,7 @@ def test_broken_https_lookup():
     check.https_lookup(
         dom_in, timeout=TIMEOUT, agent=USER_AGENT, verbose=False
     )
-    assert len(dom_in.headers) <= 0, "There should be no response."
+    assert len(dom_in["headers"]) <= 0, "There should be no response."
 
 
 def test_whois():
@@ -112,47 +112,3 @@ def test_broken_whois():
     check = cdnCheck()
     return_code = check.ip_whois_bulk_lookup(pot, verbose=False)
     assert return_code != 0, "This fake site should return a non 0 code."
-
-
-# def test_all_checks():
-#     """Run all checks."""
-#     dom_in = Domain("login.gov", list(), list(), list(), list(), list(), list(), list())
-#     check = cdnCheck()
-#     check.all_checks(dom_in, timeout=TIMEOUT, agent=USER_AGENT)
-
-#     assert (
-#         ".cloudfront.net" in dom_in.cdns
-#     ), "the ip for dns.google.com should be 8.8.8.8"
-
-
-# def test_all_checks_by_name():
-#     """Run all checks and get CDN name."""
-#     dom_in = Domain("login.gov", list(), list(), list(), list(), list(), list(), list())
-#     check = cdnCheck()
-#     check.all_checks(dom_in, timeout=TIMEOUT, agent=USER_AGENT)
-
-#     assert (
-#         ".cloudfront.net" in dom_in.cdns
-#     ), "the ip for dns.google.com should be 8.8.8.8"
-
-
-# def test_all_checks_bad():
-#     """Test fake domain and ensure it dosen't break anything."""
-#     dns.resolver.default_resolver = dns.resolver.Resolver()
-#     dns.resolver.default_resolver.nameservers = ["1.1.1.1", "8.8.8.8"]
-#     dom = Domain(
-#         "super.definitelynot.notarealdomain.fakedomaindne.com",
-#         list(),
-#         list(),
-#         list(),
-#         list(),
-#         list(),
-#         list(),
-#         list(),
-#     )
-#     print(dom.url, dom.cdns, dom.cnames, dom.headers, dom.whois_data, dom.ip)
-#     check = cdnCheck()
-#     return_code = check.all_checks(dom, timeout=TIMEOUT, agent=USER_AGENT)
-#     print(return_code)
-#     print(dom.url, dom.cdns, dom.cnames, dom.headers, dom.whois_data, dom.ip)
-#     assert return_code != 0, "This fake site should return a non 0 code."
