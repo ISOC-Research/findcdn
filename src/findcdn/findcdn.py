@@ -97,8 +97,7 @@ def main(
 
     # Show the validated domains if in verbose mode
     if verbose:
-        print("%d Domains Validated" % len(domain_list))
-    logger.info("%d Domains Validated" % len(domain_list))
+        logger.info("%d Domains Validated" % len(domain_list))
 
     # Define domain dict and counter for json
     domain_dict = {}
@@ -143,15 +142,13 @@ def main(
 
     # Show the dump to stdout if verbose
     if verbose:
-        print(json_dump)
-    logger.debug("Results:\n"+json_dump)
+        logger.debug("Results:\n"+json_dump)
 
     # Export to file if file provided
     if output_path is not None:
         write_json(json_dump, output_path)
     if verbose:
-        print("Domain processing completed. %d jobs completed.\n%d domains had CDN's out of %d." % (cnt, CDN_count, len(domain_list)))
-    logger.info("Domain processing completed. %d jobs completed.\n%d domains had CDN's out of %d." % (cnt, CDN_count, len(domain_list)))
+        logger.info("Domain processing completed. %d jobs completed.\n%d domains had CDN's out of %d." % (cnt, CDN_count, len(domain_list)))
 
     # Return json dump to callee
     return json_dump
@@ -217,7 +214,6 @@ def interactive() -> None:
         validated_args: Dict[str, Any] = schema.validate(args)
     except SchemaError as err:
         # Exit because one or more of the arguments were invalid
-        print(err, file=sys.stderr)
         logger.error("Argument error: %s" % err)
         sys.exit(1)
 
@@ -228,7 +224,6 @@ def interactive() -> None:
             with open(validated_args["<fileIn>"]) as f:
                 domain_list = [line.rstrip() for line in f]
         except IOError as e:
-            print("A file error occurred: %s" % e, file=sys.stderr)
             logger.error("A file error occurred: %s" % e)
             sys.exit(1)
     else:
@@ -249,18 +244,14 @@ def interactive() -> None:
         )
     # Check for all potential exceptions
     except OutputFileExists as ofe:
-        print(ofe.message)
         logger.error("Error: %s" % ofe.message)
         sys.exit(1)
     except FileWriteError as fwe:
-        print(fwe.message)
         logger.error("Error: %s" % fwe.message)
         sys.exit(2)
     except InvalidDomain as invdom:
-        print(invdom.message)
         logger.error("Error: %s" % invdom.message)
         sys.exit(3)
     except NoDomains as nd:
-        print(nd.message)
         logger.error("Error: %s" % nd.message)
         sys.exit(4)
