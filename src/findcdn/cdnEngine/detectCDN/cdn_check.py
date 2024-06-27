@@ -87,7 +87,7 @@ class cdnCheck:
 
         # if there are no IPs, do not run
         if len(lookupIPs) == 0:
-            logger.info("No IPs, skipping")
+            logger.debug("No IPs, skipping")
             return 1
         
         # define a temp list to assign
@@ -101,7 +101,7 @@ class cdnCheck:
         tc_content += "255.255.255.255\nend"
 
         # run the whois lookup
-        logger.info(f'Running team-cymru query for {len(lookupIPs)} IPs')
+        logger.debug(f'Running team-cymru query for {len(lookupIPs)} IPs')
         
         # run the query
         tc_response = netcat("whois.cymru.com", 43, tc_content.encode())
@@ -206,7 +206,7 @@ class cdnCheck:
             total_cname_time += finish_cname-start_cname
         
         logger.debug(f"Total CNAME Time: {total_cname_time}")
-        logger.info(f"Extra checks done: {extra_count}")
+        logger.debug(f"Extra checks done: {extra_count}")
         # Return to calling function
         return 0
     
@@ -239,7 +239,7 @@ class cdnCheck:
         
         finish_tiebreak = time()
         logger.debug(f"Total tiebreak time: {finish_tiebreak-start_tiebreak}")
-        logger.info(f"Tiebreaks done: {tiebreak_count}")
+        logger.debug(f"Tiebreaks done: {tiebreak_count}")
         # Return to calling function
         return 0
     
