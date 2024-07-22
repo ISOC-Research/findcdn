@@ -78,6 +78,7 @@ def main(
     timeout: int = TIMEOUT,
     user_agent: str = USER_AGENT,
     log_level: str = LOG_LEVEL,
+    interactive: bool = False,
 ) -> str:
     """Take in a list of domains and determine the CDN for each return (JSON, number of successful jobs)."""
 
@@ -141,8 +142,9 @@ def main(
     json_dump = json.dumps(json_dict, indent=4, sort_keys=False)
 
     # Show the dump to stdout if verbose
-    if verbose:
+    if verbose or interactive:
         logger.debug("Results:\n"+json_dump)
+        print("Results:\n"+json_dump)
 
     # Export to file if file provided
     if output_path is not None:
@@ -241,6 +243,7 @@ def interactive() -> None:
             validated_args["--timeout"],
             validated_args["--user_agent"],
             validated_args["--log_level"],
+            True,
         )
     # Check for all potential exceptions
     except OutputFileExists as ofe:
